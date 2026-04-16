@@ -9,6 +9,8 @@ import { UsersModule } from './modules/users/users.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { MessagesModule } from './modules/messages/messages.module';
 
+import { UploadModule } from './modules/upload/upload.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -27,6 +29,7 @@ import { MessagesModule } from './modules/messages/messages.module';
     ConversationsModule,
     MessagesModule,
     NotificationsModule,
+    UploadModule,
   ],
 })
 export class AppModule {}
