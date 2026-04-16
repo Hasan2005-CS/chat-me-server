@@ -8,6 +8,7 @@ export const envSchema = z.object({
   MONGODB_URI: z.string().default('mongodb://localhost:27017/chat-me'),
   JWT_SECRET: z.string().min(16),
   JWT_EXPIRES_IN: z.string().default('7d'),
+  JWT_REFRESH_SECRET: z.string().min(16),
   GOOGLE_CLIENT_ID: z.string().min(1),
   GOOGLE_CLIENT_SECRET: z.string().min(1),
   GOOGLE_CALLBACK_URL: z.string().url(),
@@ -15,6 +16,8 @@ export const envSchema = z.object({
   GITHUB_CLIENT_ID: z.string().min(1),
   GITHUB_CLIENT_SECRET: z.string().min(1),
   GITHUB_CALLBACK_URL: z.string().url(),
+
+  CLOUDINARY_URL: z.string().url().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -36,6 +39,7 @@ export default () => ({
   jwt: {
     secret: env.JWT_SECRET,
     expiresIn: env.JWT_EXPIRES_IN,
+    refreshSecret: env.JWT_REFRESH_SECRET,
   },
 
   google: {
@@ -48,6 +52,10 @@ export default () => ({
     clientId: env.GITHUB_CLIENT_ID,
     clientSecret: env.GITHUB_CLIENT_SECRET,
     callbackUrl: env.GITHUB_CALLBACK_URL,
+  },
+
+  cloudinary: {
+    url: env.CLOUDINARY_URL,
   },
 });
 

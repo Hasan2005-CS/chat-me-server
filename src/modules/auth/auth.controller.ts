@@ -1,4 +1,14 @@
-import { Controller, Post, Get, Body, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Req,
+  Res,
+  UseGuards,
+  UnauthorizedException,
+} from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
@@ -16,14 +26,36 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
-  register(@Body() dto: RegisterDto) {
-    return this.authService.registerLocal(dto);
+  register(
+    @Body() dto: RegisterDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.authService.registerLocal(dto, res);
   }
 
   @UseGuards(LocalAuthGuard)
   @Post('login')
-  login(@Req() req: RequestWithUser) {
-    return this.authService.generateToken(req.user);
+  login(
+    @Req() req: RequestWithUser,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.authService.generateTokens(req.user, res);
+  }
+
+  @Post('refresh')
+  refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const token = req.cookies?.refresh_token as string | undefined;
+    if (!token) throw new UnauthorizedException('No refresh token');
+    return this.authService.refreshTokens(token, res);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('logout')
+  logout(
+    @Req() req: RequestWithUser,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.authService.logout(req.user.id, res);
   }
 
   @UseGuards(GoogleAuthGuard)
@@ -32,8 +64,11 @@ export class AuthController {
 
   @UseGuards(GoogleAuthGuard)
   @Get('google/callback')
-  googleCallback(@Req() req: RequestWithUser) {
-    return this.authService.generateToken(req.user);
+  googleCallback(
+    @Req() req: RequestWithUser,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.authService.generateTokens(req.user, res);
   }
 
   @UseGuards(GitHubAuthGuard)
@@ -42,8 +77,11 @@ export class AuthController {
 
   @UseGuards(GitHubAuthGuard)
   @Get('github/callback')
-  githubCallback(@Req() req: RequestWithUser) {
-    return this.authService.generateToken(req.user);
+  githubCallback(
+    @Req() req: RequestWithUser,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.authService.generateTokens(req.user, res);
   }
 
   @UseGuards(JwtAuthGuard)

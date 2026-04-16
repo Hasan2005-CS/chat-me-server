@@ -49,6 +49,9 @@ export class User {
 
   @Prop({ default: Date.now })
   lastSeenAt!: Date;
+
+  @Prop({ select: false })
+  refreshToken?: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
