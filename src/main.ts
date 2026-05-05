@@ -5,9 +5,15 @@ import { ZodValidationPipe } from 'nestjs-zod';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
+import { AppLogger } from './common/logger/logger.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+  });
+
+  app.useLogger(new AppLogger());
+
   app.use(helmet());
   app.use(cookieParser());
   app.setGlobalPrefix('api/v1');

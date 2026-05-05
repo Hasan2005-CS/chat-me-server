@@ -9,13 +9,17 @@ export const envSchema = z.object({
   JWT_SECRET: z.string().min(16),
   JWT_EXPIRES_IN: z.string().default('7d'),
   JWT_REFRESH_SECRET: z.string().min(16),
-  GOOGLE_CLIENT_ID: z.string().min(1),
-  GOOGLE_CLIENT_SECRET: z.string().min(1),
-  GOOGLE_CALLBACK_URL: z.string().url(),
 
-  GITHUB_CLIENT_ID: z.string().min(1),
-  GITHUB_CLIENT_SECRET: z.string().min(1),
-  GITHUB_CALLBACK_URL: z.string().url(),
+  GOOGLE_CLIENT_ID: z.string().default('placeholder'),
+  GOOGLE_CLIENT_SECRET: z.string().default('placeholder'),
+  GOOGLE_CALLBACK_URL: z
+    .string()
+    .default('http://localhost:3000/api/v1/auth/google/callback'),
+  GITHUB_CLIENT_ID: z.string().default('placeholder'),
+  GITHUB_CLIENT_SECRET: z.string().default('placeholder'),
+  GITHUB_CALLBACK_URL: z
+    .string()
+    .default('http://localhost:3000/api/v1/auth/github/callback'),
 
   CLOUDINARY_CLOUD_NAME: z.string().min(1),
   CLOUDINARY_API_KEY: z.string().min(1),
