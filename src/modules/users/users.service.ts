@@ -69,4 +69,31 @@ export class UsersService {
       refreshToken: hashed,
     });
   }
+  async search(query: string, currentUserId: string) {
+    if (!query || query.trim().length < 2) return [];
+    const regex = new RegExp(query.trim(), 'i');
+    return this.userModel
+      .find({
+        _id: { $ne: currentUserId },
+        $or: [{ displayName: regex }, { email: regex }],
+      })
+      .select('displayName email avatar')
+      .limit(10);
+  }
+
+  async updateProfile(
+    userId: string,
+    data: { displayName?: string; bio?: string },
+  ): Promise<UserDocument | null> {
+    return this.userModel.findByIdAndUpdate(userId, data, { new: true }).exec();
+  }
+
+  async updateAvatar(
+    userId: string,
+    avatarUrl: string,
+  ): Promise<UserDocument | null> {
+    return this.userModel
+      .findByIdAndUpdate(userId, { avatar: avatarUrl }, { new: true })
+      .exec();
+  }
 }

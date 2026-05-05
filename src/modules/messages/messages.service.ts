@@ -29,6 +29,9 @@ export class MessagesService {
       content: dto.content,
       type: dto.type ?? 'text',
       replyTo: dto.replyTo ? new Types.ObjectId(dto.replyTo) : undefined,
+      receipts: [
+        { user: new Types.ObjectId(dto.senderId), status: MessageStatus.SENT },
+      ],
     });
   }
 
@@ -53,18 +56,62 @@ export class MessagesService {
   }
 
   async updateStatus(messageId: string, userId: string, status: MessageStatus) {
-    await this.messageModel.findByIdAndUpdate(
-      messageId,
+    const userOid = new Types.ObjectId(userId);
+    const updated = await this.messageModel.findOneAndUpdate(
+      { _id: new Types.ObjectId(messageId), 'receipts.user': userOid },
+      { $set: { 'receipts.$.status': status } },
+    );
+    if (!updated) {
+      await this.messageModel.findByIdAndUpdate(messageId, {
+        $push: { receipts: { user: userOid, status } },
+      });
+    }
+  }
+
+  // Mark all unacknowledged messages as DELIVERED for a user coming online.
+  // Returns a map of conversationId → messageIds so the gateway can broadcast.
+  async markDelivered(
+    userId: string,
+    conversationIds: string[],
+  ): Promise<Map<string, string[]>> {
+    if (conversationIds.length === 0) return new Map();
+
+    const userOid = new Types.ObjectId(userId);
+    const conversationOids = conversationIds.map(
+      (id) => new Types.ObjectId(id),
+    );
+
+    const messages = await this.messageModel.find(
       {
-        $set: {
-          'receipts.$[elem].status': status,
+        conversation: { $in: conversationOids },
+        sender: { $ne: userOid },
+        'receipts.user': { $ne: userOid },
+      },
+      '_id conversation',
+    );
+
+    if (messages.length === 0) return new Map();
+
+    const messageIds = messages.map((m) => m._id as Types.ObjectId);
+
+    await this.messageModel.updateMany(
+      { _id: { $in: messageIds } },
+      {
+        $push: {
+          receipts: { user: userOid, status: MessageStatus.DELIVERED },
         },
       },
-      {
-        arrayFilters: [{ 'elem.user': new Types.ObjectId(userId) }],
-      },
     );
+
+    const result = new Map<string, string[]>();
+    for (const msg of messages) {
+      const convId = msg.conversation.toString();
+      if (!result.has(convId)) result.set(convId, []);
+      result.get(convId)!.push((msg._id as Types.ObjectId).toString());
+    }
+    return result;
   }
+
   async softDelete(messageId: string, senderId: string): Promise<boolean> {
     const result = await this.messageModel.findOneAndUpdate(
       {

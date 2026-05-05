@@ -8,6 +8,8 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { UsersModule } from './modules/users/users.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { MessagesModule } from './modules/messages/messages.module';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 import { UploadModule } from './modules/upload/upload.module';
 
@@ -30,6 +32,24 @@ import { UploadModule } from './modules/upload/upload.module';
     MessagesModule,
     NotificationsModule,
     UploadModule,
+    ThrottlerModule.forRoot([
+      {
+        name: 'short',
+        ttl: 1000,
+        limit: 10,
+      },
+      {
+        name: 'long',
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

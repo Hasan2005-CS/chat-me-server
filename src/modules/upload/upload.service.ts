@@ -1,18 +1,16 @@
-import {Injectable} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {v2 as cloudinary, UploadApiResponse} from 'cloudinary';
-import { buffer } from 'stream/consumers';
+import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 
 @Injectable()
 export class UploadService {
-constructor(private configService: ConfigService) {
+  constructor(private configService: ConfigService) {
     cloudinary.config({
-        cloud_name: this.configService.get<string>('CLOUDINARY_CLOUD_NAME'),
-        api_key: this.configService.get<string>('CLOUDINARY_API_KEY'),
-        api_secret: this.configService.get<string>('CLOUDINARY_API_SECRET'),
+      cloud_name: this.configService.get<string>('CLOUDINARY_CLOUD_NAME'),
+      api_key: this.configService.get<string>('CLOUDINARY_API_KEY'),
+      api_secret: this.configService.get<string>('CLOUDINARY_API_SECRET'),
     });
-
-}
+  }
   async uploadFile(
     buffer: Buffer,
     folder: string,
@@ -35,8 +33,7 @@ constructor(private configService: ConfigService) {
     });
   }
 
-  async deleteFile(publicId: string){
+  async deleteFile(publicId: string) {
     await cloudinary.uploader.destroy(publicId);
   }
 }
-

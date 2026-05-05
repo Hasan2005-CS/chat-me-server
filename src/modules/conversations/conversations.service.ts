@@ -1,4 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
@@ -79,5 +84,72 @@ export class ConversationsService {
   }
   async findById(id: string): Promise<ConversationDocument | null> {
     return this.conversationModel.findById(id);
+  }
+
+  private async findGroupAsAdmin(
+    conversationId: string,
+    adminId: string,
+  ): Promise<ConversationDocument> {
+    const conversation = await this.conversationModel.findById(conversationId);
+    if (!conversation) throw new NotFoundException('Conversation not found');
+    if (conversation.type !== 'group')
+      throw new BadRequestException('Not a group conversation');
+    if (String(conversation.admin) !== adminId)
+      throw new ForbiddenException(
+        'Only the group admin can perform this action',
+      );
+    return conversation;
+  }
+
+  async addMembers(
+    conversationId: string,
+    adminId: string,
+    memberIds: string[],
+  ): Promise<ConversationDocument> {
+    await this.findGroupAsAdmin(conversationId, adminId);
+    const newMemberOids = memberIds.map((id) => new Types.ObjectId(id));
+    return (await this.conversationModel
+      .findByIdAndUpdate(
+        conversationId,
+        { $addToSet: { members: { $each: newMemberOids } } },
+        { new: true },
+      )
+      .populate('members', 'displayName email avatar'))!;
+  }
+
+  async removeMember(
+    conversationId: string,
+    requesterId: string,
+    targetUserId: string,
+  ): Promise<ConversationDocument> {
+    const conversation = await this.conversationModel.findById(conversationId);
+    if (!conversation) throw new NotFoundException('Conversation not found');
+    if (conversation.type !== 'group')
+      throw new BadRequestException('Not a group conversation');
+
+    const isSelf = requesterId === targetUserId;
+    const isAdmin = String(conversation.admin) === requesterId;
+
+    if (!isSelf && !isAdmin)
+      throw new ForbiddenException('Only the admin can remove other members');
+
+    return (await this.conversationModel
+      .findByIdAndUpdate(
+        conversationId,
+        { $pull: { members: new Types.ObjectId(targetUserId) } },
+        { new: true },
+      )
+      .populate('members', 'displayName email avatar'))!;
+  }
+
+  async renameGroup(
+    conversationId: string,
+    adminId: string,
+    name: string,
+  ): Promise<ConversationDocument> {
+    await this.findGroupAsAdmin(conversationId, adminId);
+    return (await this.conversationModel
+      .findByIdAndUpdate(conversationId, { name }, { new: true })
+      .populate('members', 'displayName email avatar'))!;
   }
 }

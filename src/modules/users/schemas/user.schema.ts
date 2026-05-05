@@ -61,3 +61,4 @@ UserSchema.index(
   { unique: true, sparse: true },
 );
 UserSchema.index({ email: 1 });
+UserSchema.index({ displayName: 'text', email: 'text' });

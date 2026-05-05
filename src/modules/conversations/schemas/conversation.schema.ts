@@ -20,7 +20,7 @@ export class Conversation {
   @Prop({ default: Date.now })
   lastMessageAt!: Date;
 
-  @Prop({ type: Types.ObjectId, ref: 'Message' }) 
+  @Prop({ type: Types.ObjectId, ref: 'Message' })
   lastMessage?: Types.ObjectId;
   @Prop({ type: Types.ObjectId, ref: 'User' })
   admin?: Types.ObjectId;

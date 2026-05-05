@@ -3,15 +3,24 @@ import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { ZodValidationPipe } from 'nestjs-zod';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
+import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-
+  app.use(helmet());
+  app.use(cookieParser());
   app.setGlobalPrefix('api/v1');
 
   app.useGlobalPipes(new ZodValidationPipe());
-
-  app.enableCors();
+  app.enableCors({
+    origin:
+      process.env.NODE_ENV === 'production'
+        ? 'https://chat-me.com'
+        : 'http://localhost:5173',
+    credentials: true,
+  });
+  app.useGlobalFilters(new GlobalExceptionFilter());
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('port');

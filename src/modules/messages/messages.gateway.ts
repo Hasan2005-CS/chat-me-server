@@ -87,6 +87,20 @@ export class MessagesGateway
         await socket.join(conversation.id);
       }
 
+      // Mark all pending messages as DELIVERED and notify conversation rooms
+      const conversationIds = conversations.map((c) => String(c.id));
+      const deliveredMap = await this.messagesService.markDelivered(
+        payload.sub,
+        conversationIds,
+      );
+      for (const [convId, messageIds] of deliveredMap) {
+        this.server.to(convId).emit('messages_delivered', {
+          messageIds,
+          conversationId: convId,
+          recipientIds: [payload.sub],
+        });
+      }
+
       console.log(`User ${payload.sub} connected`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -152,6 +166,28 @@ export class MessagesGateway
       const offlineMembers = memberIds.filter(
         (id) => id !== senderId && !this.isUserOnline(id),
       );
+      const onlineRecipients = memberIds.filter(
+        (id) => id !== senderId && this.isUserOnline(id),
+      );
+
+      // Auto-mark DELIVERED for all online recipients
+      if (onlineRecipients.length > 0) {
+        await Promise.all(
+          onlineRecipients.map((id) =>
+            this.messagesService.updateStatus(
+              message.id,
+              id,
+              MessageStatus.DELIVERED,
+            ),
+          ),
+        );
+        this.server.to(body.conversationId).emit('messages_delivered', {
+          messageIds: [message.id],
+          conversationId: body.conversationId,
+          recipientIds: onlineRecipients,
+        });
+      }
+
       if (offlineMembers.length > 0) {
         await this.notificationsService.notifyNewMessage(
           offlineMembers,
@@ -166,24 +202,22 @@ export class MessagesGateway
           },
         );
       }
-      memberIds
-        .filter((id) => id !== senderId && this.isUserOnline(id))
-        .forEach((memberId) => {
-          const memberSocketId = this.onlineUsers.get(memberId);
-          if (memberSocketId) {
-            this.server.to(memberSocketId).emit('notification', {
-              type: NotificationType.NEW_MESSAGE,
-              payload: {
-                conversationId: body.conversationId,
-                senderName: socket.user.email,
-                preview:
-                  body.type === 'text'
-                    ? body.content.slice(0, 100)
-                    : `Sent a ${body.type} message`,
-              },
-            });
-          }
-        });
+      onlineRecipients.forEach((memberId) => {
+        const memberSocketId = this.onlineUsers.get(memberId);
+        if (memberSocketId) {
+          this.server.to(memberSocketId).emit('notification', {
+            type: NotificationType.NEW_MESSAGE,
+            payload: {
+              conversationId: body.conversationId,
+              senderName: socket.user.email,
+              preview:
+                body.type === 'text'
+                  ? body.content.slice(0, 100)
+                  : `Sent a ${body.type} message`,
+            },
+          });
+        }
+      });
     }
   }
 
@@ -213,16 +247,26 @@ export class MessagesGateway
   @SubscribeMessage('mark_read')
   async handleMarkRead(
     @ConnectedSocket() socket: AuthSocket,
-    @MessageBody() body: { messageId: string },
+    @MessageBody() body: { messageId: string; conversationId: string },
   ) {
+    const isMember = await this.conversationsService.isMember(
+      body.conversationId,
+      socket.user.sub,
+    );
+    if (!isMember) {
+      socket.emit('error', { message: 'Not authorized.' });
+      return;
+    }
+
     await this.messagesService.updateStatus(
       body.messageId,
       socket.user.sub,
       MessageStatus.READ,
     );
 
-    this.server.emit('message_read', {
+    this.server.to(body.conversationId).emit('message_read', {
       messageId: body.messageId,
+      conversationId: body.conversationId,
       readBy: socket.user.sub,
     });
   }
