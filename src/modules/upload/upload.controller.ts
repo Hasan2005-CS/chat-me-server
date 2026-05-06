@@ -13,12 +13,32 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { UploadService } from './upload.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 
+@ApiTags('Upload')
+@ApiBearerAuth('JWT')
 @Controller('upload')
 export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
   @UseGuards(JwtAuthGuard)
   @Post('image')
+  @ApiOperation({ summary: 'Upload an image file' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+    },
+  })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -53,6 +73,17 @@ export class UploadController {
 
   @UseGuards(JwtAuthGuard)
   @Post('file')
+  @ApiOperation({ summary: 'Upload a generic file' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+    },
+  })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),

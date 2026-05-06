@@ -19,11 +19,21 @@ import { UsersService } from './users.service';
 import { UploadService } from '../upload/upload.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UserDocument } from './schemas/user.schema';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 
 interface RequestWithUser extends Request {
   user: UserDocument;
 }
 
+@ApiTags('Users')
+@ApiBearerAuth('JWT')
 @Controller('users')
 export class UsersController {
   constructor(
@@ -33,12 +43,24 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Get('search')
+  @ApiOperation({ summary: 'Search users' })
+  @ApiQuery({ name: 'q', required: true, type: String, example: 'hasan' })
   search(@Query('q') query: string, @Req() req: RequestWithUser) {
     return this.usersService.search(query, req.user._id.toString());
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch('me')
+  @ApiOperation({ summary: 'Update the current user profile' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        displayName: { type: 'string', example: 'Hasan Saaf' },
+        bio: { type: 'string', example: 'Building real-time chat apps' },
+      },
+    },
+  })
   updateProfile(
     @Req() req: RequestWithUser,
     @Body() body: { displayName?: string; bio?: string },
@@ -48,6 +70,17 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Patch('me/avatar')
+  @ApiOperation({ summary: 'Update the current user avatar' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['avatar'],
+      properties: {
+        avatar: { type: 'string', format: 'binary' },
+      },
+    },
+  })
   @UseInterceptors(FileInterceptor('avatar', { storage: memoryStorage() }))
   async updateAvatar(
     @Req() req: RequestWithUser,

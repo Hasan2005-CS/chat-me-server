@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { AppLogger } from './common/logger/logger.service';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -14,7 +15,9 @@ async function bootstrap() {
 
   app.useLogger(new AppLogger());
 
-  app.use(helmet());
+   app.use(helmet({
+    contentSecurityPolicy: false, 
+  }));
   app.use(cookieParser());
   app.setGlobalPrefix('api/v1');
 

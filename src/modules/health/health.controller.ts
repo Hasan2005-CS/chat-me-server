@@ -6,7 +6,9 @@ import {
   MemoryHealthIndicator,
   DiskHealthIndicator,
 } from '@nestjs/terminus';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Health')
 @Controller('health')
 export class HealthController {
   constructor(
@@ -18,6 +20,8 @@ export class HealthController {
 
   @Get()
   @HealthCheck()
+  @ApiOperation({ summary: 'Check application health' })
+  @ApiOkResponse({ description: 'The service is healthy and Info about the server components status' })
   check() {
     return this.health.check([
       () => this.mongoose.pingCheck('mongodb'),
