@@ -62,12 +62,12 @@ export class UploadController {
     );
 
     return {
-      url:      result.secure_url,
+      url: result.secure_url,
       publicId: result.public_id,
-      width:    result.width,
-      height:   result.height,
-      format:   result.format,
-      size:     result.bytes,
+      width: result.width,
+      height: result.height,
+      format: result.format,
+      size: result.bytes,
     };
   }
 
@@ -92,9 +92,7 @@ export class UploadController {
   async uploadFile(
     @UploadedFile(
       new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 20 * 1024 * 1024 }),
-        ],
+        validators: [new MaxFileSizeValidator({ maxSize: 20 * 1024 * 1024 })],
       }),
     )
     file: Express.Multer.File,
@@ -106,11 +104,11 @@ export class UploadController {
     );
 
     return {
-      url:          result.secure_url,
-      publicId:     result.public_id,
+      url: result.secure_url,
+      publicId: result.public_id,
       originalName: file.originalname,
-      size:         result.bytes,
-      format:       result.format,
+      size: result.bytes,
+      format: result.format,
     };
   }
 }

@@ -40,7 +40,7 @@ export class AuthController {
   @ApiBody({
     schema: {
       properties: {
-        email:    { type: 'string', example: 'hasansaafen1234@gmail.com' },
+        email: { type: 'string', example: 'hasansaafen1234@gmail.com' },
         password: { type: 'string', example: 'Password123!' },
       },
     },
@@ -102,8 +102,7 @@ export class AuthController {
 
   @ApiOperation({ summary: 'Get current user' })
   @ApiBearerAuth('JWT')
-    @UseGuards(JwtAuthGuard)
-
+  @UseGuards(JwtAuthGuard)
   @Get('me')
   getMe(@Req() req: RequestWithUser) {
     return req.user;

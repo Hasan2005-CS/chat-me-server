@@ -21,7 +21,10 @@ export class HealthController {
   @Get()
   @HealthCheck()
   @ApiOperation({ summary: 'Check application health' })
-  @ApiOkResponse({ description: 'The service is healthy and Info about the server components status' })
+  @ApiOkResponse({
+    description:
+      'The service is healthy and Info about the server components status',
+  })
   check() {
     return this.health.check([
       () => this.mongoose.pingCheck('mongodb'),

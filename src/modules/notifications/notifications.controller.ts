@@ -4,7 +4,12 @@ import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UserDocument } from '../users/schemas/user.schema';
 import { NotificationDocument } from './schemas/notification.schema';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 interface RequestWithUser extends Request {
   user: UserDocument;
 }

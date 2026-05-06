@@ -15,11 +15,12 @@ async function bootstrap() {
 
   app.useLogger(new AppLogger());
 
-   app.use(helmet({
-    contentSecurityPolicy: false, 
-  }));
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+    }),
+  );
   app.use(cookieParser());
-  app.setGlobalPrefix('api/v1');
 
   app.useGlobalPipes(new ZodValidationPipe());
   app.enableCors({
@@ -29,14 +30,43 @@ async function bootstrap() {
         : 'http://localhost:5173',
     credentials: true,
   });
+  const config = new DocumentBuilder()
+    .setTitle('ChatMe API')
+    .setDescription('API documentation for ChatMe application')
+    .setVersion('1.0')
+    .setExternalDoc(
+      'GitHub Repository',
+      'https://github.com/Hasan2005-CS/chat-me-server',
+    )
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Enter JWT token',
+      },
+      'JWT',
+    )
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      tagsSorter: 'alpha',
+      operationsSorter: 'alpha',
+    },
+    customSiteTitle: 'Chat-Me API Documentation',
+  });
   app.useGlobalFilters(new GlobalExceptionFilter());
+
+  app.setGlobalPrefix('api/v1');
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('port');
   app.use(cookieParser());
 
   await app.listen(port as number);
-  console.log(`🚀 Server running on http://localhost:${port}/api/v1`);
+  console.log(`Server running on http://localhost:${port}/api/v1`);
 }
 
 bootstrap();
