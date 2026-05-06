@@ -14,42 +14,27 @@ async function bootstrap() {
   });
 
   app.useLogger(new AppLogger());
-
-  app.use(
-    helmet({
-      contentSecurityPolicy: false,
-    }),
-  );
+  app.use(helmet({ contentSecurityPolicy: false }));
   app.use(cookieParser());
-
   app.useGlobalPipes(new ZodValidationPipe());
+  app.useGlobalFilters(new GlobalExceptionFilter());
   app.enableCors({
-    origin:
-      process.env.NODE_ENV === 'production'
-        ? 'https://chat-me.com'
-        : 'http://localhost:5173',
+    origin: process.env.NODE_ENV === 'production'
+      ? 'https://chat-me.app'
+      : 'http://localhost:5173',
     credentials: true,
   });
+
   const config = new DocumentBuilder()
     .setTitle('ChatMe API')
     .setDescription('API documentation for ChatMe application')
     .setVersion('1.0')
-    .setExternalDoc(
-      'GitHub Repository',
-      'https://github.com/Hasan2005-CS/chat-me-server',
-    )
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        description: 'Enter JWT token',
-      },
-      'JWT',
-    )
+    .setExternalDoc('GitHub Repository', 'https://github.com/Hasan2005-CS/chat-me-server')
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'JWT')
     .build();
+
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document, {
+  SwaggerModule.setup('docs', app, document, {
     swaggerOptions: {
       persistAuthorization: true,
       tagsSorter: 'alpha',
@@ -57,16 +42,15 @@ async function bootstrap() {
     },
     customSiteTitle: 'Chat-Me API Documentation',
   });
-  app.useGlobalFilters(new GlobalExceptionFilter());
 
   app.setGlobalPrefix('api/v1');
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('port');
-  app.use(cookieParser());
 
   await app.listen(port as number);
   console.log(`Server running on http://localhost:${port}/api/v1`);
+  console.log(`Swagger docs: http://localhost:${port}/docs`);
 }
 
 bootstrap();
