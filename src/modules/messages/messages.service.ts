@@ -68,8 +68,6 @@ export class MessagesService {
     }
   }
 
-  // Mark all unacknowledged messages as DELIVERED for a user coming online.
-  // Returns a map of conversationId → messageIds so the gateway can broadcast.
   async markDelivered(
     userId: string,
     conversationIds: string[],

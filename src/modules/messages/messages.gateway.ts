@@ -87,7 +87,6 @@ export class MessagesGateway
         await socket.join(conversation.id);
       }
 
-      // Mark all pending messages as DELIVERED and notify conversation rooms
       const conversationIds = conversations.map((c) => String(c.id));
       const deliveredMap = await this.messagesService.markDelivered(
         payload.sub,
@@ -170,7 +169,6 @@ export class MessagesGateway
         (id) => id !== senderId && this.isUserOnline(id),
       );
 
-      // Auto-mark DELIVERED for all online recipients
       if (onlineRecipients.length > 0) {
         await Promise.all(
           onlineRecipients.map((id) =>
