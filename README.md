@@ -272,7 +272,7 @@ cd ~
 docker compose pull
 docker compose up -d
 ```
-
+You can check the docs from here `https://chat-me.app/docs`.
 ---
 
 ## Future Work
