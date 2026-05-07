@@ -40,6 +40,8 @@ async function bootstrap() {
       persistAuthorization: true,
       tagsSorter: 'alpha',
       operationsSorter: 'alpha',
+          withCredentials:      true, 
+
     },
     customSiteTitle: 'Chat-Me API Documentation',
   });
