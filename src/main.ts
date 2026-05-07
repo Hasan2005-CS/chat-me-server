@@ -18,6 +18,7 @@ async function bootstrap() {
   app.use(cookieParser());
   app.useGlobalPipes(new ZodValidationPipe());
   app.useGlobalFilters(new GlobalExceptionFilter());
+  app.setGlobalPrefix('api/v1');
   app.enableCors({
     origin: process.env.NODE_ENV === 'production'
       ? 'https://chat-me.app'
@@ -30,6 +31,7 @@ async function bootstrap() {
     .setDescription('API documentation for ChatMe application')
     .setVersion('1.0')
     .setExternalDoc('GitHub Repository', 'https://github.com/Hasan2005-CS/chat-me-server')
+    .addServer('/api/v1')
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'JWT')
     .build();
 
@@ -42,8 +44,6 @@ async function bootstrap() {
     },
     customSiteTitle: 'Chat-Me API Documentation',
   });
-
-  app.setGlobalPrefix('api/v1');
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('port');
