@@ -31,7 +31,6 @@ async function bootstrap() {
     .setDescription('API documentation for ChatMe application')
     .setVersion('1.0')
     .setExternalDoc('GitHub Repository', 'https://github.com/Hasan2005-CS/chat-me-server')
-    .addServer('/api/v1')
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'JWT')
     .build();
 
