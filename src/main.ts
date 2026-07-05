@@ -21,7 +21,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
   app.enableCors({
     origin: process.env.NODE_ENV === 'production'
-      ? 'https://chat-me.app'
+      ? 'http://localhost:5173'
       : 'http://localhost:5173',
     credentials: true,
   });
