@@ -9,6 +9,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
@@ -25,7 +26,23 @@ interface RequestWithUser extends Request {
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  private async completeOAuthRedirect(
+    req: RequestWithUser,
+    res: Response,
+  ): Promise<void> {
+    const frontendUrl = this.configService.getOrThrow<string>('frontendUrl');
+    try {
+      await this.authService.generateTokens(req.user, res);
+      res.redirect(`${frontendUrl}/oauth/callback`);
+    } catch {
+      res.redirect(`${frontendUrl}/oauth/callback?error=oauth_failed`);
+    }
+  }
 
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
@@ -79,11 +96,8 @@ export class AuthController {
 
   @UseGuards(GoogleAuthGuard)
   @Get('google/callback')
-  googleCallback(
-    @Req() req: RequestWithUser,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    return this.authService.generateTokens(req.user, res);
+  googleCallback(@Req() req: RequestWithUser, @Res() res: Response) {
+    return this.completeOAuthRedirect(req, res);
   }
 
   @ApiOperation({ summary: 'GitHub Auth' })
@@ -93,11 +107,8 @@ export class AuthController {
 
   @UseGuards(GitHubAuthGuard)
   @Get('github/callback')
-  githubCallback(
-    @Req() req: RequestWithUser,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    return this.authService.generateTokens(req.user, res);
+  githubCallback(@Req() req: RequestWithUser, @Res() res: Response) {
+    return this.completeOAuthRedirect(req, res);
   }
 
   @ApiOperation({ summary: 'Get current user' })

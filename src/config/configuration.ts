@@ -21,6 +21,8 @@ export const envSchema = z.object({
     .string()
     .default('http://localhost:3000/api/v1/auth/github/callback'),
 
+  FRONTEND_URL: z.string().default('http://localhost:5173'),
+
   CLOUDINARY_CLOUD_NAME: z.string().min(1),
   CLOUDINARY_API_KEY: z.string().min(1),
   CLOUDINARY_API_SECRET: z.string().min(1),
@@ -59,6 +61,8 @@ export default () => ({
     clientSecret: env.GITHUB_CLIENT_SECRET,
     callbackUrl: env.GITHUB_CALLBACK_URL,
   },
+
+  frontendUrl: env.FRONTEND_URL,
 
   cloudinary: {
     cloudName: env.CLOUDINARY_CLOUD_NAME,
