@@ -155,5 +155,148 @@ describe('AuthService', () => {
         authService.refreshTokens('valid-token', mockResponse as any),
       ).rejects.toThrow(UnauthorizedException);
     });
+
+    it('should return new token pair when refresh token matches stored hash', async () => {
+      const refreshToken = 'valid-refresh-token';
+      const storedHash = await bcrypt.hash(refreshToken, 10);
+
+      mockJwtService.verify.mockReturnValue({
+        sub: '123',
+        email: 'test@test.com',
+      });
+      mockUsersService.findByIdWithRefreshToken.mockResolvedValue({
+        id: '123',
+        email: 'test@test.com',
+        refreshToken: storedHash,
+      });
+      mockJwtService.sign.mockReturnValue('new-access-token');
+      mockUsersService.updateRefreshToken.mockResolvedValue(undefined);
+
+      const result = await authService.refreshTokens(
+        refreshToken,
+        mockResponse as any,
+      );
+
+      expect(result).toEqual({ accessToken: 'new-access-token' });
+      expect(mockResponse.cookie).toHaveBeenCalledWith(
+        'refresh_token',
+        'new-access-token',
+        expect.any(Object),
+      );
+    });
+
+    it('should throw UnauthorizedException when stored hash does not match refresh token', async () => {
+      const storedHash = await bcrypt.hash('some-other-token', 10);
+
+      mockJwtService.verify.mockReturnValue({
+        sub: '123',
+        email: 'test@test.com',
+      });
+      mockUsersService.findByIdWithRefreshToken.mockResolvedValue({
+        id: '123',
+        email: 'test@test.com',
+        refreshToken: storedHash,
+      });
+
+      await expect(
+        authService.refreshTokens('valid-refresh-token', mockResponse as any),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('generateTokens', () => {
+    it('should sign access and refresh tokens, update refresh token, set cookie, and return access token', async () => {
+      mockJwtService.sign
+        .mockReturnValueOnce('access-token')
+        .mockReturnValueOnce('refresh-token');
+      mockUsersService.updateRefreshToken.mockResolvedValue(undefined);
+
+      const user = { id: '123', email: 'test@test.com' };
+      const result = await authService.generateTokens(
+        user as any,
+        mockResponse as any,
+      );
+
+      expect(mockJwtService.sign).toHaveBeenCalledTimes(2);
+      expect(mockUsersService.updateRefreshToken).toHaveBeenCalledWith(
+        '123',
+        'refresh-token',
+      );
+      expect(mockResponse.cookie).toHaveBeenCalledWith(
+        'refresh_token',
+        'refresh-token',
+        expect.objectContaining({ httpOnly: true, sameSite: 'strict' }),
+      );
+      expect(result).toEqual({ accessToken: 'access-token' });
+    });
+  });
+
+  describe('findOrCreateOAuthUser', () => {
+    const profile = {
+      provider: 'google' as const,
+      providerId: 'gid-123',
+      email: 'oauth@test.com',
+      displayName: 'OAuth User',
+      avatar: 'http://x/avatar.png',
+      accessToken: 'oauth-access-token',
+    };
+
+    it('should return existing user found by provider and update last seen', async () => {
+      const existingUser = { id: '123', email: profile.email };
+      mockUsersService.findByProvider.mockResolvedValue(existingUser);
+      mockUsersService.updateLastSeen.mockResolvedValue(undefined);
+
+      const result = await authService.findOrCreateOAuthUser(profile);
+
+      expect(mockUsersService.findByProvider).toHaveBeenCalledWith(
+        profile.provider,
+        profile.providerId,
+      );
+      expect(mockUsersService.updateLastSeen).toHaveBeenCalledWith('123');
+      expect(result).toBe(existingUser);
+    });
+
+    it('should add identity to existing user found by email when not found by provider', async () => {
+      const existingUser = { id: '456', email: profile.email };
+      const updatedUser = { id: '456', email: profile.email, identities: [] };
+      mockUsersService.findByProvider.mockResolvedValue(null);
+      mockUsersService.findByEmail.mockResolvedValue(existingUser);
+      mockUsersService.addIdentity.mockResolvedValue(updatedUser);
+
+      const result = await authService.findOrCreateOAuthUser(profile);
+
+      expect(mockUsersService.addIdentity).toHaveBeenCalledWith('456', {
+        provider: profile.provider,
+        providerId: profile.providerId,
+        email: profile.email,
+        accessToken: profile.accessToken,
+      });
+      expect(result).toBe(updatedUser);
+    });
+
+    it('should create a new user when not found by provider or email', async () => {
+      const createdUser = { id: '789', email: profile.email };
+      mockUsersService.findByProvider.mockResolvedValue(null);
+      mockUsersService.findByEmail.mockResolvedValue(null);
+      mockUsersService.create.mockResolvedValue(createdUser);
+
+      const result = await authService.findOrCreateOAuthUser(profile);
+
+      expect(mockUsersService.create).toHaveBeenCalledWith({
+        displayName: profile.displayName,
+        email: profile.email,
+        avatar: profile.avatar,
+        isVerified: true,
+        identities: [
+          {
+            provider: profile.provider,
+            providerId: profile.providerId,
+            email: profile.email,
+            accessToken: profile.accessToken,
+          },
+        ],
+      });
+      expect(result).toBe(createdUser);
+    });
   });
 });

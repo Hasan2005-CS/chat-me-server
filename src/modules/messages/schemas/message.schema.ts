@@ -25,6 +25,7 @@ export class Message {
   sender!: Types.ObjectId;
 
   @Prop({
+    type: String,
     enum: MessageType,
     default: MessageType.TEXT,
   })
