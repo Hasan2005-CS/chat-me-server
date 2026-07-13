@@ -5,6 +5,7 @@ const mockConversationsService = {
   findOrCreateDirect: vi.fn(),
   createGroup: vi.fn(),
   findUserConversations: vi.fn(),
+  search: vi.fn(),
   addMembers: vi.fn(),
   removeMember: vi.fn(),
   renameGroup: vi.fn(),
@@ -24,18 +25,17 @@ describe('ConversationsController', () => {
   describe('createDirect', () => {
     it('should delegate to findOrCreateDirect', async () => {
       const mockResult = { id: 'c1' };
-      mockConversationsService.findOrCreateDirect.mockResolvedValue(
-        mockResult,
-      );
+      mockConversationsService.findOrCreateDirect.mockResolvedValue(mockResult);
 
       const result = await conversationsController.createDirect(req, {
         userId: 'u2',
       });
 
       expect(result).toEqual(mockResult);
-      expect(
-        mockConversationsService.findOrCreateDirect,
-      ).toHaveBeenCalledWith('123', 'u2');
+      expect(mockConversationsService.findOrCreateDirect).toHaveBeenCalledWith(
+        '123',
+        'u2',
+      );
     });
   });
 
@@ -71,6 +71,21 @@ describe('ConversationsController', () => {
       expect(
         mockConversationsService.findUserConversations,
       ).toHaveBeenCalledWith('123');
+    });
+  });
+
+  describe('search', () => {
+    it('should delegate to search', async () => {
+      const mockResult = [{ id: 'g1', name: 'Project Team' }];
+      mockConversationsService.search.mockResolvedValue(mockResult);
+
+      const result = await conversationsController.search('Project', req);
+
+      expect(result).toEqual(mockResult);
+      expect(mockConversationsService.search).toHaveBeenCalledWith(
+        '123',
+        'Project',
+      );
     });
   });
 
@@ -126,6 +141,22 @@ describe('ConversationsController', () => {
         'g1',
         '123',
         'New Name',
+      );
+    });
+  });
+
+  describe('leaveGroup', () => {
+    it('should delegate to removeMember with the requester as target', async () => {
+      const mockResult = { id: 'g1', members: [] };
+      mockConversationsService.removeMember.mockResolvedValue(mockResult);
+
+      const result = await conversationsController.leaveGroup(req, 'g1');
+
+      expect(result).toEqual(mockResult);
+      expect(mockConversationsService.removeMember).toHaveBeenCalledWith(
+        'g1',
+        '123',
+        '123',
       );
     });
   });

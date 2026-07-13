@@ -145,7 +145,7 @@ export class MessagesGateway
       conversationId: body.conversationId,
       senderId,
       content: body.content,
-      type: body.type!,
+      type: body.type,
       replyTo: body.replyTo,
     });
 
@@ -266,6 +266,148 @@ export class MessagesGateway
       messageId: body.messageId,
       conversationId: body.conversationId,
       readBy: socket.user.sub,
+    });
+  }
+
+  @UseGuards(WsJwtGuard)
+  @SubscribeMessage('typing')
+  async handleTyping(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody() body: { conversationId: string },
+  ) {
+    const isMember = await this.conversationsService.isMember(
+      body.conversationId,
+      socket.user.sub,
+    );
+    if (!isMember) return;
+
+    socket.to(body.conversationId).emit('user_typing', {
+      conversationId: body.conversationId,
+      userId: socket.user.sub,
+    });
+  }
+
+  @UseGuards(WsJwtGuard)
+  @SubscribeMessage('stop_typing')
+  async handleStopTyping(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody() body: { conversationId: string },
+  ) {
+    const isMember = await this.conversationsService.isMember(
+      body.conversationId,
+      socket.user.sub,
+    );
+    if (!isMember) return;
+
+    socket.to(body.conversationId).emit('user_stopped_typing', {
+      conversationId: body.conversationId,
+      userId: socket.user.sub,
+    });
+  }
+
+  @UseGuards(WsJwtGuard)
+  @SubscribeMessage('edit_message')
+  async handleEditMessage(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody()
+    body: { messageId: string; conversationId: string; content: string },
+  ) {
+    const updated = await this.messagesService.editMessage(
+      body.messageId,
+      socket.user.sub,
+      body.content,
+    );
+
+    if (!updated) {
+      socket.emit('error', {
+        message: 'You are not allowed to edit this message.',
+      });
+      return;
+    }
+
+    this.server.to(body.conversationId).emit('message_edited', {
+      messageId: body.messageId,
+      conversationId: body.conversationId,
+      content: updated.content,
+      editedAt: updated.editedAt,
+    });
+  }
+
+  @UseGuards(WsJwtGuard)
+  @SubscribeMessage('delete_message')
+  async handleDeleteMessage(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody() body: { messageId: string; conversationId: string },
+  ) {
+    const deleted = await this.messagesService.softDelete(
+      body.messageId,
+      socket.user.sub,
+    );
+
+    if (!deleted) {
+      socket.emit('error', {
+        message: 'You are not allowed to delete this message.',
+      });
+      return;
+    }
+
+    this.server.to(body.conversationId).emit('message_deleted', {
+      messageId: body.messageId,
+      conversationId: body.conversationId,
+    });
+  }
+
+  @UseGuards(WsJwtGuard)
+  @SubscribeMessage('add_reaction')
+  async handleAddReaction(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody()
+    body: { messageId: string; conversationId: string; emoji: string },
+  ) {
+    const isMember = await this.conversationsService.isMember(
+      body.conversationId,
+      socket.user.sub,
+    );
+    if (!isMember) {
+      socket.emit('error', { message: 'Not authorized.' });
+      return;
+    }
+
+    await this.messagesService.addReaction(
+      body.messageId,
+      socket.user.sub,
+      body.emoji,
+    );
+
+    this.server.to(body.conversationId).emit('message_reaction_added', {
+      messageId: body.messageId,
+      conversationId: body.conversationId,
+      userId: socket.user.sub,
+      emoji: body.emoji,
+    });
+  }
+
+  @UseGuards(WsJwtGuard)
+  @SubscribeMessage('remove_reaction')
+  async handleRemoveReaction(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody() body: { messageId: string; conversationId: string },
+  ) {
+    const isMember = await this.conversationsService.isMember(
+      body.conversationId,
+      socket.user.sub,
+    );
+    if (!isMember) {
+      socket.emit('error', { message: 'Not authorized.' });
+      return;
+    }
+
+    await this.messagesService.removeReaction(body.messageId, socket.user.sub);
+
+    this.server.to(body.conversationId).emit('message_reaction_removed', {
+      messageId: body.messageId,
+      conversationId: body.conversationId,
+      userId: socket.user.sub,
     });
   }
 

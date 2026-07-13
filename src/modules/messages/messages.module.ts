@@ -5,13 +5,16 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Message, MessageSchema } from './schemas/message.schema';
 import { MessagesService } from './messages.service';
 import { MessagesGateway } from './messages.gateway';
+import { MessagesController } from './messages.controller';
 import { ConversationsModule } from '../conversations/conversations.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { AuthModule } from '../auth/auth.module';
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Message.name, schema: MessageSchema }]),
     ConversationsModule,
     NotificationsModule,
+    AuthModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -20,6 +23,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       }),
     }),
   ],
+  controllers: [MessagesController],
   providers: [MessagesService, MessagesGateway],
   exports: [MessagesService],
 })

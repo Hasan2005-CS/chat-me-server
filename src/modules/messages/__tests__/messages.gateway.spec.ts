@@ -7,6 +7,10 @@ const mockMessagesService = {
   create: vi.fn(),
   markDelivered: vi.fn(),
   updateStatus: vi.fn(),
+  editMessage: vi.fn(),
+  softDelete: vi.fn(),
+  addReaction: vi.fn(),
+  removeReaction: vi.fn(),
 };
 
 const mockConversationsService = {
@@ -35,6 +39,7 @@ function createSocket(overrides: Record<string, unknown> = {}) {
     disconnect: vi.fn(),
     join: vi.fn().mockResolvedValue(undefined),
     emit: vi.fn(),
+    to: vi.fn().mockReturnThis(),
     user: undefined,
     ...overrides,
   } as any;
@@ -88,9 +93,9 @@ describe('MessagesGateway', () => {
 
       expect(socket.disconnect).not.toHaveBeenCalled();
       expect(socket.user).toEqual({ sub: 'user1', email: 'user1@test.com' });
-      expect(mockConversationsService.findUserConversations).toHaveBeenCalledWith(
-        'user1',
-      );
+      expect(
+        mockConversationsService.findUserConversations,
+      ).toHaveBeenCalledWith('user1');
       expect(socket.join).toHaveBeenCalledWith('c1');
       expect(mockMessagesService.markDelivered).toHaveBeenCalledWith('user1', [
         'c1',
@@ -182,7 +187,9 @@ describe('MessagesGateway', () => {
 
   describe('handleSendMessage', () => {
     it('emits error and does not create a message when sender is not a member', async () => {
-      const socket = createSocket({ user: { sub: 'user1', email: 'u1@test.com' } });
+      const socket = createSocket({
+        user: { sub: 'user1', email: 'u1@test.com' },
+      });
       mockConversationsService.isMember.mockResolvedValue(false);
 
       await gateway.handleSendMessage(socket, {
@@ -368,7 +375,9 @@ describe('MessagesGateway', () => {
 
   describe('handleJoinConversation', () => {
     it('emits error when socket is not a member', async () => {
-      const socket = createSocket({ user: { sub: 'user1', email: 'u1@test.com' } });
+      const socket = createSocket({
+        user: { sub: 'user1', email: 'u1@test.com' },
+      });
       mockConversationsService.isMember.mockResolvedValue(false);
 
       await gateway.handleJoinConversation(socket, { conversationId: 'c1' });
@@ -380,7 +389,9 @@ describe('MessagesGateway', () => {
     });
 
     it('joins the room and emits joined when a member', async () => {
-      const socket = createSocket({ user: { sub: 'user1', email: 'u1@test.com' } });
+      const socket = createSocket({
+        user: { sub: 'user1', email: 'u1@test.com' },
+      });
       mockConversationsService.isMember.mockResolvedValue(true);
 
       await gateway.handleJoinConversation(socket, { conversationId: 'c1' });
@@ -394,7 +405,9 @@ describe('MessagesGateway', () => {
 
   describe('handleMarkRead', () => {
     it('emits error when not a member', async () => {
-      const socket = createSocket({ user: { sub: 'user1', email: 'u1@test.com' } });
+      const socket = createSocket({
+        user: { sub: 'user1', email: 'u1@test.com' },
+      });
       mockConversationsService.isMember.mockResolvedValue(false);
 
       await gateway.handleMarkRead(socket, {
@@ -409,7 +422,9 @@ describe('MessagesGateway', () => {
     });
 
     it('updates status and emits message_read when a member', async () => {
-      const socket = createSocket({ user: { sub: 'user1', email: 'u1@test.com' } });
+      const socket = createSocket({
+        user: { sub: 'user1', email: 'u1@test.com' },
+      });
       mockConversationsService.isMember.mockResolvedValue(true);
       mockMessagesService.updateStatus.mockResolvedValue(undefined);
 
@@ -429,6 +444,238 @@ describe('MessagesGateway', () => {
         conversationId: 'c1',
         readBy: 'user1',
       });
+    });
+  });
+
+  describe('handleTyping', () => {
+    it('does nothing when not a member', async () => {
+      const socket = createSocket({
+        user: { sub: 'user1', email: 'u1@test.com' },
+      });
+      mockConversationsService.isMember.mockResolvedValue(false);
+
+      await gateway.handleTyping(socket, { conversationId: 'c1' });
+
+      expect(socket.to).not.toHaveBeenCalled();
+    });
+
+    it('broadcasts user_typing to the room when a member', async () => {
+      const socket = createSocket({
+        user: { sub: 'user1', email: 'u1@test.com' },
+      });
+      mockConversationsService.isMember.mockResolvedValue(true);
+
+      await gateway.handleTyping(socket, { conversationId: 'c1' });
+
+      expect(socket.to).toHaveBeenCalledWith('c1');
+      expect(socket.emit).toHaveBeenCalledWith('user_typing', {
+        conversationId: 'c1',
+        userId: 'user1',
+      });
+    });
+  });
+
+  describe('handleStopTyping', () => {
+    it('broadcasts user_stopped_typing to the room when a member', async () => {
+      const socket = createSocket({
+        user: { sub: 'user1', email: 'u1@test.com' },
+      });
+      mockConversationsService.isMember.mockResolvedValue(true);
+
+      await gateway.handleStopTyping(socket, { conversationId: 'c1' });
+
+      expect(socket.to).toHaveBeenCalledWith('c1');
+      expect(socket.emit).toHaveBeenCalledWith('user_stopped_typing', {
+        conversationId: 'c1',
+        userId: 'user1',
+      });
+    });
+  });
+
+  describe('handleEditMessage', () => {
+    it('emits error when editMessage resolves null', async () => {
+      const socket = createSocket({
+        user: { sub: 'user1', email: 'u1@test.com' },
+      });
+      mockMessagesService.editMessage.mockResolvedValue(null);
+
+      await gateway.handleEditMessage(socket, {
+        messageId: 'm1',
+        conversationId: 'c1',
+        content: 'edited',
+      });
+
+      expect(socket.emit).toHaveBeenCalledWith('error', {
+        message: 'You are not allowed to edit this message.',
+      });
+      expect(gateway.server.emit).not.toHaveBeenCalled();
+    });
+
+    it('broadcasts message_edited when the edit succeeds', async () => {
+      const socket = createSocket({
+        user: { sub: 'user1', email: 'u1@test.com' },
+      });
+      const editedAt = new Date();
+      mockMessagesService.editMessage.mockResolvedValue({
+        content: 'edited',
+        editedAt,
+      });
+
+      await gateway.handleEditMessage(socket, {
+        messageId: 'm1',
+        conversationId: 'c1',
+        content: 'edited',
+      });
+
+      expect(mockMessagesService.editMessage).toHaveBeenCalledWith(
+        'm1',
+        'user1',
+        'edited',
+      );
+      expect(gateway.server.to).toHaveBeenCalledWith('c1');
+      expect(gateway.server.emit).toHaveBeenCalledWith('message_edited', {
+        messageId: 'm1',
+        conversationId: 'c1',
+        content: 'edited',
+        editedAt,
+      });
+    });
+  });
+
+  describe('handleDeleteMessage', () => {
+    it('emits error when softDelete resolves false', async () => {
+      const socket = createSocket({
+        user: { sub: 'user1', email: 'u1@test.com' },
+      });
+      mockMessagesService.softDelete.mockResolvedValue(false);
+
+      await gateway.handleDeleteMessage(socket, {
+        messageId: 'm1',
+        conversationId: 'c1',
+      });
+
+      expect(socket.emit).toHaveBeenCalledWith('error', {
+        message: 'You are not allowed to delete this message.',
+      });
+      expect(gateway.server.emit).not.toHaveBeenCalled();
+    });
+
+    it('broadcasts message_deleted when the delete succeeds', async () => {
+      const socket = createSocket({
+        user: { sub: 'user1', email: 'u1@test.com' },
+      });
+      mockMessagesService.softDelete.mockResolvedValue(true);
+
+      await gateway.handleDeleteMessage(socket, {
+        messageId: 'm1',
+        conversationId: 'c1',
+      });
+
+      expect(mockMessagesService.softDelete).toHaveBeenCalledWith(
+        'm1',
+        'user1',
+      );
+      expect(gateway.server.to).toHaveBeenCalledWith('c1');
+      expect(gateway.server.emit).toHaveBeenCalledWith('message_deleted', {
+        messageId: 'm1',
+        conversationId: 'c1',
+      });
+    });
+  });
+
+  describe('handleAddReaction', () => {
+    it('emits error when not a member', async () => {
+      const socket = createSocket({
+        user: { sub: 'user1', email: 'u1@test.com' },
+      });
+      mockConversationsService.isMember.mockResolvedValue(false);
+
+      await gateway.handleAddReaction(socket, {
+        messageId: 'm1',
+        conversationId: 'c1',
+        emoji: '👍',
+      });
+
+      expect(socket.emit).toHaveBeenCalledWith('error', {
+        message: 'Not authorized.',
+      });
+      expect(mockMessagesService.addReaction).not.toHaveBeenCalled();
+    });
+
+    it('adds the reaction and broadcasts message_reaction_added when a member', async () => {
+      const socket = createSocket({
+        user: { sub: 'user1', email: 'u1@test.com' },
+      });
+      mockConversationsService.isMember.mockResolvedValue(true);
+      mockMessagesService.addReaction.mockResolvedValue({ id: 'm1' });
+
+      await gateway.handleAddReaction(socket, {
+        messageId: 'm1',
+        conversationId: 'c1',
+        emoji: '👍',
+      });
+
+      expect(mockMessagesService.addReaction).toHaveBeenCalledWith(
+        'm1',
+        'user1',
+        '👍',
+      );
+      expect(gateway.server.to).toHaveBeenCalledWith('c1');
+      expect(gateway.server.emit).toHaveBeenCalledWith(
+        'message_reaction_added',
+        {
+          messageId: 'm1',
+          conversationId: 'c1',
+          userId: 'user1',
+          emoji: '👍',
+        },
+      );
+    });
+  });
+
+  describe('handleRemoveReaction', () => {
+    it('emits error when not a member', async () => {
+      const socket = createSocket({
+        user: { sub: 'user1', email: 'u1@test.com' },
+      });
+      mockConversationsService.isMember.mockResolvedValue(false);
+
+      await gateway.handleRemoveReaction(socket, {
+        messageId: 'm1',
+        conversationId: 'c1',
+      });
+
+      expect(socket.emit).toHaveBeenCalledWith('error', {
+        message: 'Not authorized.',
+      });
+      expect(mockMessagesService.removeReaction).not.toHaveBeenCalled();
+    });
+
+    it('removes the reaction and broadcasts message_reaction_removed when a member', async () => {
+      const socket = createSocket({
+        user: { sub: 'user1', email: 'u1@test.com' },
+      });
+      mockConversationsService.isMember.mockResolvedValue(true);
+      mockMessagesService.removeReaction.mockResolvedValue({ id: 'm1' });
+
+      await gateway.handleRemoveReaction(socket, {
+        messageId: 'm1',
+        conversationId: 'c1',
+      });
+
+      expect(mockMessagesService.removeReaction).toHaveBeenCalledWith(
+        'm1',
+        'user1',
+      );
+      expect(gateway.server.to).toHaveBeenCalledWith('c1');
+      expect(gateway.server.emit).toHaveBeenCalledWith(
+        'message_reaction_removed',
+        {
+          messageId: 'm1',
+          conversationId: 'c1',
+          userId: 'user1',
+        },
+      );
     });
   });
 

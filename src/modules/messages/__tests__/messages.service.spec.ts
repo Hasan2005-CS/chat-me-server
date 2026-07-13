@@ -8,6 +8,7 @@ const mockMessageModel = {
   findOneAndUpdate: vi.fn(),
   findByIdAndUpdate: vi.fn(),
   updateMany: vi.fn(),
+  updateOne: vi.fn(),
   create: vi.fn(),
 };
 
@@ -128,7 +129,7 @@ describe('MessagesService', () => {
       expect(result).toEqual(mockMessages);
       const query = mockMessageModel.find.mock.calls[0][0];
       expect(query._id).toBeDefined();
-      expect((query._id as any).$lt.toString()).toBe(before);
+      expect(query._id.$lt.toString()).toBe(before);
     });
   });
 
@@ -255,6 +256,104 @@ describe('MessagesService', () => {
       );
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe('editMessage', () => {
+    it('should update content and mark the message as edited when the sender owns it', async () => {
+      const updated = { id: 'm1', content: 'edited', isEdited: true };
+      mockMessageModel.findOneAndUpdate.mockResolvedValue(updated);
+
+      const messageId = new Types.ObjectId().toString();
+      const senderId = new Types.ObjectId().toString();
+      const result = await messagesService.editMessage(
+        messageId,
+        senderId,
+        'edited',
+      );
+
+      expect(result).toEqual(updated);
+      const [filter, update, options] =
+        mockMessageModel.findOneAndUpdate.mock.calls[0];
+      expect(filter.sender.toString()).toBe(senderId);
+      expect(filter.isDeleted).toBe(false);
+      expect(update.content).toBe('edited');
+      expect(update.isEdited).toBe(true);
+      expect(update.editedAt).toBeInstanceOf(Date);
+      expect(options).toEqual({ new: true });
+    });
+
+    it('should return null when the message does not exist or is not owned by the sender', async () => {
+      mockMessageModel.findOneAndUpdate.mockResolvedValue(null);
+
+      const result = await messagesService.editMessage(
+        new Types.ObjectId().toString(),
+        new Types.ObjectId().toString(),
+        'edited',
+      );
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('addReaction', () => {
+    it('should pull any existing reaction from the user before pushing the new one', async () => {
+      const updated = { id: 'm1', reactions: [{ emoji: '👍' }] };
+      mockMessageModel.updateOne.mockResolvedValue({});
+      mockMessageModel.findByIdAndUpdate.mockResolvedValue(updated);
+
+      const messageId = new Types.ObjectId().toString();
+      const userId = new Types.ObjectId().toString();
+      const result = await messagesService.addReaction(messageId, userId, '👍');
+
+      expect(result).toEqual(updated);
+      const [pullFilter, pullUpdate] = mockMessageModel.updateOne.mock.calls[0];
+      expect(pullFilter._id.toString()).toBe(messageId);
+      expect(pullUpdate.$pull.reactions.user.toString()).toBe(userId);
+
+      const [id, pushUpdate, options] =
+        mockMessageModel.findByIdAndUpdate.mock.calls[0];
+      expect(id).toBe(messageId);
+      expect(pushUpdate.$push.reactions.user.toString()).toBe(userId);
+      expect(pushUpdate.$push.reactions.emoji).toBe('👍');
+      expect(options).toEqual({ new: true });
+    });
+  });
+
+  describe('removeReaction', () => {
+    it('should pull the reaction belonging to the user', async () => {
+      const updated = { id: 'm1', reactions: [] };
+      mockMessageModel.findByIdAndUpdate.mockResolvedValue(updated);
+
+      const messageId = new Types.ObjectId().toString();
+      const userId = new Types.ObjectId().toString();
+      const result = await messagesService.removeReaction(messageId, userId);
+
+      expect(result).toEqual(updated);
+      const [id, update, options] =
+        mockMessageModel.findByIdAndUpdate.mock.calls[0];
+      expect(id).toBe(messageId);
+      expect(update.$pull.reactions.user.toString()).toBe(userId);
+      expect(options).toEqual({ new: true });
+    });
+  });
+
+  describe('search', () => {
+    it('should query by conversation, non-deleted, and a case-insensitive content regex', async () => {
+      const mockMessages = [{ id: 'm1', content: 'hello world' }];
+      const limitFn = vi.fn().mockResolvedValue(mockMessages);
+      const sortFn = vi.fn().mockReturnValue({ limit: limitFn });
+      const populateFn = vi.fn().mockReturnValue({ sort: sortFn });
+      mockMessageModel.find.mockReturnValue({ populate: populateFn });
+
+      const conversationId = new Types.ObjectId().toString();
+      const result = await messagesService.search(conversationId, 'hello');
+
+      expect(result).toEqual(mockMessages);
+      const query = mockMessageModel.find.mock.calls[0][0];
+      expect(query.conversation.toString()).toBe(conversationId);
+      expect(query.isDeleted).toBe(false);
+      expect(query.content).toEqual({ $regex: 'hello', $options: 'i' });
     });
   });
 });

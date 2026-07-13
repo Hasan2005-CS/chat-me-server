@@ -90,7 +90,7 @@ export class MessagesService {
 
     if (messages.length === 0) return new Map();
 
-    const messageIds = messages.map((m) => m._id as Types.ObjectId);
+    const messageIds = messages.map((m) => m._id);
 
     await this.messageModel.updateMany(
       { _id: { $in: messageIds } },
@@ -105,7 +105,7 @@ export class MessagesService {
     for (const msg of messages) {
       const convId = msg.conversation.toString();
       if (!result.has(convId)) result.set(convId, []);
-      result.get(convId)!.push((msg._id as Types.ObjectId).toString());
+      result.get(convId).push(msg._id.toString());
     }
     return result;
   }
@@ -119,5 +119,65 @@ export class MessagesService {
       { isDeleted: true },
     );
     return !!result;
+  }
+
+  async editMessage(
+    messageId: string,
+    senderId: string,
+    content: string,
+  ): Promise<MessageDocument | null> {
+    return this.messageModel.findOneAndUpdate(
+      {
+        _id: new Types.ObjectId(messageId),
+        sender: new Types.ObjectId(senderId),
+        isDeleted: false,
+      },
+      { content, isEdited: true, editedAt: new Date() },
+      { new: true },
+    );
+  }
+
+  async addReaction(
+    messageId: string,
+    userId: string,
+    emoji: string,
+  ): Promise<MessageDocument | null> {
+    const userOid = new Types.ObjectId(userId);
+    await this.messageModel.updateOne(
+      { _id: new Types.ObjectId(messageId) },
+      { $pull: { reactions: { user: userOid } } },
+    );
+    return this.messageModel.findByIdAndUpdate(
+      messageId,
+      { $push: { reactions: { user: userOid, emoji } } },
+      { new: true },
+    );
+  }
+
+  async removeReaction(
+    messageId: string,
+    userId: string,
+  ): Promise<MessageDocument | null> {
+    return this.messageModel.findByIdAndUpdate(
+      messageId,
+      { $pull: { reactions: { user: new Types.ObjectId(userId) } } },
+      { new: true },
+    );
+  }
+
+  async search(
+    conversationId: string,
+    query: string,
+    limit: number = 30,
+  ): Promise<MessageDocument[]> {
+    return this.messageModel
+      .find({
+        conversation: new Types.ObjectId(conversationId),
+        isDeleted: false,
+        content: { $regex: query, $options: 'i' },
+      })
+      .populate('sender', 'displayName avatar')
+      .sort({ createdAt: -1 })
+      .limit(limit);
   }
 }

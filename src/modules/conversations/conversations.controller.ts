@@ -7,6 +7,7 @@ import {
   Body,
   Req,
   Param,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { Request } from 'express';
@@ -19,6 +20,7 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 interface RequestWithUser extends Request {
   user: UserDocument;
@@ -85,6 +87,16 @@ export class ConversationsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('search')
+  @ApiOperation({
+    summary: 'Search the current user group conversations by name',
+  })
+  @ApiQuery({ name: 'q', required: true, type: String, example: 'Project' })
+  search(@Query('q') query: string, @Req() req: RequestWithUser) {
+    return this.conversationsService.search(req.user.id, query);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Patch(':id/members')
   @ApiOperation({ summary: 'Add members to a group conversation' })
   @ApiParam({ name: 'id', description: 'Conversation id' })
@@ -124,6 +136,14 @@ export class ConversationsController {
     @Param('userId') userId: string,
   ) {
     return this.conversationsService.removeMember(id, req.user.id, userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/leave')
+  @ApiOperation({ summary: 'Leave a group conversation' })
+  @ApiParam({ name: 'id', description: 'Conversation id' })
+  leaveGroup(@Req() req: RequestWithUser, @Param('id') id: string) {
+    return this.conversationsService.removeMember(id, req.user.id, req.user.id);
   }
 
   @UseGuards(JwtAuthGuard)

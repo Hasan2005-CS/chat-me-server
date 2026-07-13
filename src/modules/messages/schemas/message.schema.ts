@@ -58,6 +58,27 @@ export class Message {
 
   @Prop({ default: false })
   isDeleted!: boolean;
+
+  @Prop({ default: false })
+  isEdited!: boolean;
+
+  @Prop()
+  editedAt?: Date;
+
+  @Prop({
+    type: [
+      {
+        user: { type: Types.ObjectId, ref: 'User' },
+        emoji: { type: String },
+      },
+    ],
+    default: [],
+    _id: false,
+  })
+  reactions!: {
+    user: Types.ObjectId;
+    emoji: string;
+  }[];
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);

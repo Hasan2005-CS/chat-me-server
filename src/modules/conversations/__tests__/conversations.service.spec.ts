@@ -94,6 +94,28 @@ describe('ConversationsService', () => {
     });
   });
 
+  describe('search', () => {
+    it('should query by member and name regex, returning sorted, populated conversations', async () => {
+      const mockConversations = [{ id: 'g1', name: 'Project Team' }];
+      const sort = vi.fn().mockResolvedValue(mockConversations);
+      const populate = vi.fn().mockReturnThis();
+      mockConversationModel.find.mockReturnValue({
+        populate,
+        sort,
+      });
+
+      const result = await conversationsService.search(
+        '507f1f77bcf86cd799439011',
+        'Project',
+      );
+
+      expect(result).toEqual(mockConversations);
+      const query = mockConversationModel.find.mock.calls[0][0];
+      expect(query.members.toString()).toBe('507f1f77bcf86cd799439011');
+      expect(query.name).toEqual({ $regex: 'Project', $options: 'i' });
+    });
+  });
+
   describe('updateLastMessage', () => {
     it('should call findByIdAndUpdate with lastMessage and lastMessageAt', async () => {
       mockConversationModel.findByIdAndUpdate.mockResolvedValue(undefined);

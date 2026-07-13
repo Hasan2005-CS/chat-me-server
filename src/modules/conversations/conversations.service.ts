@@ -65,6 +65,17 @@ export class ConversationsService {
       .sort({ lastMessageAt: -1 });
   }
 
+  async search(userId: string, query: string): Promise<ConversationDocument[]> {
+    return this.conversationModel
+      .find({
+        members: new Types.ObjectId(userId),
+        name: { $regex: query, $options: 'i' },
+      })
+      .populate('members', 'displayName email avatar')
+      .populate('lastMessage')
+      .sort({ lastMessageAt: -1 });
+  }
+
   async updateLastMessage(
     conversationId: string,
     messageId: string,
@@ -108,13 +119,13 @@ export class ConversationsService {
   ): Promise<ConversationDocument> {
     await this.findGroupAsAdmin(conversationId, adminId);
     const newMemberOids = memberIds.map((id) => new Types.ObjectId(id));
-    return (await this.conversationModel
+    return await this.conversationModel
       .findByIdAndUpdate(
         conversationId,
         { $addToSet: { members: { $each: newMemberOids } } },
         { new: true },
       )
-      .populate('members', 'displayName email avatar'))!;
+      .populate('members', 'displayName email avatar');
   }
 
   async removeMember(
@@ -133,13 +144,13 @@ export class ConversationsService {
     if (!isSelf && !isAdmin)
       throw new ForbiddenException('Only the admin can remove other members');
 
-    return (await this.conversationModel
+    return await this.conversationModel
       .findByIdAndUpdate(
         conversationId,
         { $pull: { members: new Types.ObjectId(targetUserId) } },
         { new: true },
       )
-      .populate('members', 'displayName email avatar'))!;
+      .populate('members', 'displayName email avatar');
   }
 
   async renameGroup(
@@ -148,8 +159,8 @@ export class ConversationsService {
     name: string,
   ): Promise<ConversationDocument> {
     await this.findGroupAsAdmin(conversationId, adminId);
-    return (await this.conversationModel
+    return await this.conversationModel
       .findByIdAndUpdate(conversationId, { name }, { new: true })
-      .populate('members', 'displayName email avatar'))!;
+      .populate('members', 'displayName email avatar');
   }
 }
