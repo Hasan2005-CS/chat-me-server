@@ -118,13 +118,23 @@ export class AuthService {
     await this.usersService.updateRefreshToken(user.id, refreshToken);
 
     res.cookie('refresh_token', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      ...this.refreshCookieOptions(),
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     return { accessToken };
+  }
+
+  private refreshCookieOptions() {
+    const isProduction = this.configService.get('nodeEnv') === 'production';
+    const domain = this.configService.get<string | undefined>('cookieDomain');
+
+    return {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax' as const,
+      ...(domain ? { domain } : {}),
+    };
   }
 
   async refreshTokens(refreshToken: string, res: Response): Promise<TokenPair> {
@@ -153,7 +163,7 @@ export class AuthService {
   async logout(userId: string, res: Response): Promise<{ message: string }> {
     await this.usersService.updateRefreshToken(userId, null);
 
-    res.clearCookie('refresh_token');
+    res.clearCookie('refresh_token', this.refreshCookieOptions());
 
     return { message: 'Log out successfully!' };
   }

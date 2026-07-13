@@ -30,6 +30,13 @@ const mockConfigService = {
     };
     return config[key];
   }),
+  get: vi.fn((key: string) => {
+    const config: Record<string, string | undefined> = {
+      nodeEnv: 'test',
+      cookieDomain: undefined,
+    };
+    return config[key];
+  }),
 };
 const mockResponse = {
   cookie: vi.fn(),
@@ -131,7 +138,10 @@ describe('AuthService', () => {
       '123',
       null,
     );
-    expect(mockResponse.clearCookie).toHaveBeenCalledWith('refresh_token');
+    expect(mockResponse.clearCookie).toHaveBeenCalledWith(
+      'refresh_token',
+      expect.any(Object),
+    );
   });
   describe('refreshTokens', () => {
     it('should throw UnauthorizedException if token is invalid', async () => {
@@ -225,7 +235,7 @@ describe('AuthService', () => {
       expect(mockResponse.cookie).toHaveBeenCalledWith(
         'refresh_token',
         'refresh-token',
-        expect.objectContaining({ httpOnly: true, sameSite: 'strict' }),
+        expect.objectContaining({ httpOnly: true, sameSite: 'lax' }),
       );
       expect(result).toEqual({ accessToken: 'access-token' });
     });
