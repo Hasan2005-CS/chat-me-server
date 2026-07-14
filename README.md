@@ -30,18 +30,18 @@ The system is deployed on a DigitalOcean Droplet, served over HTTPS via Nginx, a
 
 ```
 Client (HTTP / WebSocket)
-        |
-      Nginx (Reverse Proxy + SSL)
-        |
-   NestJS Application
-        |
-   ┌────────────────────────────┐
-   | Auth | Users | Messages   |
-   | Conversations | Upload    |
-   | Notifications | Health    |
-   └────────────────────────────┘
-        |                |
-  MongoDB Atlas     Cloudinary
+|
+Nginx (Reverse Proxy + SSL)
+|
+NestJS Application
+|
+┌────────────────────────────┐
+| Auth | Users | Messages |
+| Conversations | Upload |
+| Notifications | Health |
+└────────────────────────────┘
+| |
+MongoDB Atlas Cloudinary
 ```
 
 The application follows a feature-based module structure. Each module owns its schema, service, controller, and any guards or strategies it needs. Shared concerns such as error handling and logging live in a common layer.
@@ -55,7 +55,7 @@ Authentication is built on the Identity Linking pattern: a single user document 
 **Authentication**
 
 - Local registration and login with email and password
-- OAuth 2.0 via Google and GitHub
+- OAuth 2.0 via Google and GitHub, redirecting back to the frontend's OAuth callback route once tokens are issued
 - JWT-based access tokens with a 15-minute expiry
 - Refresh tokens stored as bcrypt hashes in the database and delivered via httpOnly cookies, which allows proper revocation on logout
 - Identity linking across providers on the same email address
@@ -66,13 +66,16 @@ Authentication is built on the Identity Linking pattern: a single user document 
 - JWT authentication on the WebSocket handshake
 - Message types: text, image, audio, file
 - Reply-to support
-- Soft delete
+- Message editing and soft delete
+- Emoji reactions on messages
+- Typing indicators
+- Search messages within a conversation
 
 **Message Status**
 
 - Sent, delivered, and read receipts per recipient
 - Automatic delivery marking when a user connects
-- Automatic read marking when a user opens a conversation
+- Read marking when a user marks a message as read
 
 **Notifications**
 
@@ -174,6 +177,8 @@ The server will be available at `http://localhost:3000/api/v1`.
 | GITHUB_CLIENT_ID | GitHub OAuth client ID |
 | GITHUB_CLIENT_SECRET | GitHub OAuth client secret |
 | GITHUB_CALLBACK_URL | GitHub OAuth redirect URL |
+| FRONTEND_URL | Frontend origin used for CORS and post-OAuth redirects (default: http://localhost:5173) |
+| COOKIE_DOMAIN | Optional domain scope applied to the refresh token cookie |
 | CLOUDINARY_CLOUD_NAME | Cloudinary cloud name |
 | CLOUDINARY_API_KEY | Cloudinary API key |
 | CLOUDINARY_API_SECRET | Cloudinary API secret |
@@ -196,6 +201,8 @@ All endpoints are prefixed with `/api/v1`.
 | GET | /auth/google | Initiate Google OAuth flow |
 | GET | /auth/github | Initiate GitHub OAuth flow |
 
+On success, the Google and GitHub callbacks issue tokens and redirect the browser to `${FRONTEND_URL}/oauth/callback` (or to the same route with an `?error=oauth_failed` query parameter on failure) instead of returning JSON directly.
+
 **Users**
 
 | Method | Endpoint | Description |
@@ -209,6 +216,13 @@ All endpoints are prefixed with `/api/v1`.
 | POST | /conversations/direct | Create or fetch a direct conversation |
 | POST | /conversations/group | Create a group conversation |
 | GET | /conversations | List current user's conversations |
+
+**Messages**
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | /messages/:conversationId | Get messages for a conversation (paginated, requires membership) |
+| GET | /messages/:conversationId/search?q= | Search messages within a conversation by content |
 
 **Notifications**
 
@@ -246,15 +260,28 @@ const socket = io('wss://chat-me.app/chat', {
 |---|---|---|
 | send_message | { conversationId, content, type?, replyTo? } | Send a message |
 | join_conversation | { conversationId } | Join a conversation room |
-| open_conversation | { conversationId } | Mark messages as read |
-| mark_read | { messageId } | Mark a single message as read |
+| mark_read | { messageId, conversationId } | Mark a single message as read |
+| typing | { conversationId } | Notify the room that the user started typing |
+| stop_typing | { conversationId } | Notify the room that the user stopped typing |
+| edit_message | { messageId, conversationId, content } | Edit a message you previously sent |
+| delete_message | { messageId, conversationId } | Soft delete a message you previously sent |
+| add_reaction | { messageId, conversationId, emoji } | Add (or replace) your emoji reaction on a message |
+| remove_reaction | { messageId, conversationId } | Remove your emoji reaction from a message |
 
 | Event (listen) | Description |
 |---|---|
 | new_message | A new message arrived |
 | messages_delivered | Messages were delivered to a user |
-| messages_read | Messages were read by a user |
+| message_read | A message was read by a user |
+| user_typing | A user started typing in a conversation |
+| user_stopped_typing | A user stopped typing in a conversation |
+| message_edited | A message was edited |
+| message_deleted | A message was deleted |
+| message_reaction_added | A reaction was added to a message |
+| message_reaction_removed | A reaction was removed from a message |
 | notification | A real-time notification |
+| joined | Confirmation that the socket joined a conversation room |
+| error | An error occurred while processing a socket event |
 
 ---
 
@@ -273,6 +300,7 @@ docker compose pull
 docker compose up -d
 ```
 You can check the docs from here `https://chat-me.app/docs`.
+
 ---
 
 ## Future Work
@@ -287,17 +315,9 @@ The current notification system stores unread notifications in the database and 
 
 Messages are currently stored in plaintext in the database. Implementing the Signal Protocol or a similar double-ratchet scheme would ensure that only the communicating parties can read message content.
 
-**Automated Testing**
-
-The project currently has no test suite. Adding unit tests for the authentication and messaging services, and integration tests for the critical API endpoints, would significantly increase confidence in the correctness of the system and make future changes safer.
-
 **Voice and Video Calls**
 
 The WebSocket infrastructure is already in place. Adding WebRTC signaling through the existing Socket.io gateway would enable peer-to-peer audio and video calls without routing media through the server.
-
-**Message Search**
-
-Full-text search across message history using MongoDB Atlas Search or Elasticsearch would allow users to find past messages quickly, which becomes important as conversation history grows.
 
 **Horizontal Scaling**
 
