@@ -24,6 +24,9 @@ export class Conversation {
   lastMessage?: Types.ObjectId;
   @Prop({ type: Types.ObjectId, ref: 'User' })
   admin?: Types.ObjectId;
+
+  @Prop({ type: [Types.ObjectId], ref: 'User', default: [] })
+  deletedFor!: Types.ObjectId[];
 }
 
 export const ConversationSchema = SchemaFactory.createForClass(Conversation);

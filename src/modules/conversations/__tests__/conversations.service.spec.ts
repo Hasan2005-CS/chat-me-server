@@ -348,4 +348,48 @@ describe('ConversationsService', () => {
       ).rejects.toThrow(BadRequestException);
     });
   });
+
+  describe('deleteChat', () => {
+    it('should add the requester to deletedFor when they are a member', async () => {
+      mockConversationModel.findById.mockResolvedValue({
+        id: 'c1',
+        members: ['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012'],
+      });
+      mockConversationModel.findByIdAndUpdate.mockResolvedValue(undefined);
+
+      const result = await conversationsService.deleteChat(
+        'c1',
+        '507f1f77bcf86cd799439011',
+      );
+
+      expect(result).toEqual({ deleted: true });
+      expect(mockConversationModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        'c1',
+        expect.objectContaining({
+          $addToSet: { deletedFor: expect.anything() },
+        }),
+      );
+    });
+
+    it('should throw NotFoundException when the conversation does not exist', async () => {
+      mockConversationModel.findById.mockResolvedValue(null);
+
+      await expect(
+        conversationsService.deleteChat('missing', '507f1f77bcf86cd799439011'),
+      ).rejects.toThrow(NotFoundException);
+      expect(mockConversationModel.findByIdAndUpdate).not.toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException when the requester is not a member', async () => {
+      mockConversationModel.findById.mockResolvedValue({
+        id: 'c1',
+        members: ['507f1f77bcf86cd799439012'],
+      });
+
+      await expect(
+        conversationsService.deleteChat('c1', '507f1f77bcf86cd799439011'),
+      ).rejects.toThrow(NotFoundException);
+      expect(mockConversationModel.findByIdAndUpdate).not.toHaveBeenCalled();
+    });
+  });
 });

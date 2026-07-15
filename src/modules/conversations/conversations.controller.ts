@@ -166,4 +166,15 @@ export class ConversationsController {
   ) {
     return this.conversationsService.renameGroup(id, req.user.id, body.name);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id')
+  @ApiOperation({
+    summary:
+      'Delete a chat for the current user only (it stays visible to other members)',
+  })
+  @ApiParam({ name: 'id', description: 'Conversation id' })
+  deleteChat(@Req() req: RequestWithUser, @Param('id') id: string) {
+    return this.conversationsService.deleteChat(id, req.user.id);
+  }
 }

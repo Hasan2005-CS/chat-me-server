@@ -59,6 +59,7 @@ export class ConversationsService {
     return this.conversationModel
       .find({
         members: new Types.ObjectId(userId),
+        deletedFor: { $ne: new Types.ObjectId(userId) },
       })
       .populate('members', 'displayName email avatar')
       .populate('lastMessage')
@@ -69,6 +70,7 @@ export class ConversationsService {
     return this.conversationModel
       .find({
         members: new Types.ObjectId(userId),
+        deletedFor: { $ne: new Types.ObjectId(userId) },
         name: { $regex: query, $options: 'i' },
       })
       .populate('members', 'displayName email avatar')
@@ -83,7 +85,26 @@ export class ConversationsService {
     await this.conversationModel.findByIdAndUpdate(conversationId, {
       lastMessage: new Types.ObjectId(messageId),
       lastMessageAt: new Date(),
+      deletedFor: [],
     });
+  }
+
+  async deleteChat(
+    conversationId: string,
+    userId: string,
+  ): Promise<{ deleted: true }> {
+    const conversation = await this.conversationModel.findById(conversationId);
+    if (
+      !conversation ||
+      !conversation.members.some((memberId) => String(memberId) === userId)
+    ) {
+      throw new NotFoundException('Conversation not found');
+    }
+
+    await this.conversationModel.findByIdAndUpdate(conversationId, {
+      $addToSet: { deletedFor: new Types.ObjectId(userId) },
+    });
+    return { deleted: true };
   }
 
   async isMember(conversationId: string, userId: string): Promise<boolean> {

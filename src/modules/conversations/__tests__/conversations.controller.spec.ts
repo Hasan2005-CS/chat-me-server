@@ -9,6 +9,7 @@ const mockConversationsService = {
   addMembers: vi.fn(),
   removeMember: vi.fn(),
   renameGroup: vi.fn(),
+  deleteChat: vi.fn(),
 };
 
 describe('ConversationsController', () => {
@@ -156,6 +157,21 @@ describe('ConversationsController', () => {
       expect(mockConversationsService.removeMember).toHaveBeenCalledWith(
         'g1',
         '123',
+        '123',
+      );
+    });
+  });
+
+  describe('deleteChat', () => {
+    it('should delegate to deleteChat', async () => {
+      const mockResult = { deleted: true };
+      mockConversationsService.deleteChat.mockResolvedValue(mockResult);
+
+      const result = await conversationsController.deleteChat(req, 'c1');
+
+      expect(result).toEqual(mockResult);
+      expect(mockConversationsService.deleteChat).toHaveBeenCalledWith(
+        'c1',
         '123',
       );
     });
