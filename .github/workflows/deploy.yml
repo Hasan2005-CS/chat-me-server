@@ -63,11 +63,11 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 5
-          max_attempts: 3
+          max_attempts: 2
           retry_on: error
           command: |
-            ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} '
-              cd ~
-              docker compose pull
-              docker compose up -d
-              docker image prune -f
+            ssh -T -i ~/.ssh/deploy_key \
+                -o StrictHostKeyChecking=no \
+                -o BatchMode=yes \
+                ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
+                'cd ~ && docker compose pull && docker compose up -d && docker image prune -f' < /dev/null
