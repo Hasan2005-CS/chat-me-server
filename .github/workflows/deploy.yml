@@ -61,9 +61,4 @@ jobs:
 
       - name: Deploy to DigitalOcean
         run: |
-          time ssh -T -i ~/.ssh/deploy_key \
-              -o StrictHostKeyChecking=no \
-              -o BatchMode=yes \
-              -o ConnectTimeout=10 \
-              ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
-              'cd ~ && docker compose pull && docker compose up -d && docker image prune -f' < /dev/null
+          time ssh -T -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} 'cd ~ && docker compose pull && docker compose up -d && docker image prune -f' < /dev/null
