@@ -14,13 +14,19 @@ const mockConversationModel = {
   findByIdAndUpdate: vi.fn(),
 };
 
+const mockUsersService = {
+  isBlockRelated: vi.fn(),
+};
+
 describe('ConversationsService', () => {
   let conversationsService: ConversationsService;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUsersService.isBlockRelated.mockResolvedValue(false);
     conversationsService = new ConversationsService(
       mockConversationModel as any,
+      mockUsersService as any,
     );
   });
 
@@ -54,6 +60,19 @@ describe('ConversationsService', () => {
         expect.objectContaining({ type: 'direct' }),
       );
     });
+
+    it('should throw ForbiddenException when the users are block-related', async () => {
+      mockConversationModel.findOne.mockResolvedValue(null);
+      mockUsersService.isBlockRelated.mockResolvedValue(true);
+
+      await expect(
+        conversationsService.findOrCreateDirect(
+          '507f1f77bcf86cd799439011',
+          '507f1f77bcf86cd799439012',
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockConversationModel.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('createGroup', () => {
@@ -72,6 +91,17 @@ describe('ConversationsService', () => {
       expect(createArg.type).toBe('group');
       expect(createArg.name).toBe('Team');
       expect(createArg.members).toHaveLength(3);
+    });
+
+    it('should throw ForbiddenException when a member is block-related to the admin', async () => {
+      mockUsersService.isBlockRelated.mockResolvedValue(true);
+
+      await expect(
+        conversationsService.createGroup('Team', '507f1f77bcf86cd799439011', [
+          '507f1f77bcf86cd799439012',
+        ]),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockConversationModel.create).not.toHaveBeenCalled();
     });
   });
 
@@ -222,6 +252,20 @@ describe('ConversationsService', () => {
       await expect(
         conversationsService.addMembers('g1', 'not-admin', ['u2']),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw ForbiddenException when a new member is block-related to the admin', async () => {
+      mockConversationModel.findById.mockResolvedValue({
+        id: 'g1',
+        type: 'group',
+        admin: 'admin1',
+      });
+      mockUsersService.isBlockRelated.mockResolvedValue(true);
+
+      await expect(
+        conversationsService.addMembers('g1', 'admin1', ['u2']),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockConversationModel.findByIdAndUpdate).not.toHaveBeenCalled();
     });
   });
 
