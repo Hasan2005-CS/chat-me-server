@@ -10,6 +10,7 @@ import { ConversationsModule } from './modules/conversations/conversations.modul
 import { MessagesModule } from './modules/messages/messages.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { PresenceModule } from './modules/presence/presence.module';
 
 import { UploadModule } from './modules/upload/upload.module';
 
@@ -32,6 +33,7 @@ import { UploadModule } from './modules/upload/upload.module';
     MessagesModule,
     NotificationsModule,
     UploadModule,
+    PresenceModule,
     ThrottlerModule.forRoot([
       {
         name: 'short',

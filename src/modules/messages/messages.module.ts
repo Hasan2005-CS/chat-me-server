@@ -9,12 +9,15 @@ import { MessagesController } from './messages.controller';
 import { ConversationsModule } from '../conversations/conversations.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuthModule } from '../auth/auth.module';
+import { UsersModule } from '../users/users.module';
+
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Message.name, schema: MessageSchema }]),
     ConversationsModule,
     NotificationsModule,
     AuthModule,
+    UsersModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

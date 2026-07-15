@@ -13,6 +13,8 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { MessagesService } from './messages.service';
 import { ConversationsService } from '../conversations/conversations.service';
+import { UsersService } from '../users/users.service';
+import { PresenceService } from '../presence/presence.service';
 import { WsJwtGuard } from './guards/ws-jwt.guard';
 import { MessageStatus } from './schemas/message.schema';
 import { NotificationType } from '../notifications/schemas/notification.schema';
@@ -36,14 +38,14 @@ export class MessagesGateway
   @WebSocketServer()
   server!: Server;
 
-  private onlineUsers = new Map<string, string>();
-
   constructor(
     private readonly messagesService: MessagesService,
     private readonly conversationsService: ConversationsService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly notificationsService: NotificationsService,
+    private readonly usersService: UsersService,
+    private readonly presenceService: PresenceService,
   ) {}
 
   private extractToken(socket: AuthSocket): string | null {
@@ -78,13 +80,26 @@ export class MessagesGateway
 
       socket.user = payload;
 
-      this.onlineUsers.set(payload.sub, socket.id);
-
       const conversations =
         await this.conversationsService.findUserConversations(payload.sub);
 
       for (const conversation of conversations) {
-        await socket.join(conversation.id);
+        await socket.join(String(conversation.id));
+      }
+
+      // addConnection returns true only for the FIRST active connection of
+      // this user (handles multiple tabs/devices correctly).
+      const justCameOnline = this.presenceService.addConnection(
+        payload.sub,
+        socket.id,
+      );
+
+      if (justCameOnline) {
+        for (const conversation of conversations) {
+          this.server.to(String(conversation.id)).emit('user_online', {
+            userId: payload.sub,
+          });
+        }
       }
 
       const conversationIds = conversations.map((c) => String(c.id));
@@ -108,12 +123,33 @@ export class MessagesGateway
     }
   }
 
-  handleDisconnect(socket: AuthSocket) {
+  async handleDisconnect(socket: AuthSocket) {
     const userId = socket.user?.sub;
-    if (userId) {
-      this.onlineUsers.delete(userId);
-      console.log(`User ${userId} disconnected`);
+    if (!userId) return;
+
+    // removeConnection returns true only when NO other tabs/devices for
+    // this user remain connected (i.e. they are truly offline now).
+    const justWentOffline = this.presenceService.removeConnection(
+      userId,
+      socket.id,
+    );
+
+    if (justWentOffline) {
+      const lastSeenAt = new Date();
+      await this.usersService.updateLastSeen(userId);
+
+      const conversations =
+        await this.conversationsService.findUserConversations(userId);
+
+      for (const conversation of conversations) {
+        this.server.to(String(conversation.id)).emit('user_offline', {
+          userId,
+          lastSeenAt,
+        });
+      }
     }
+
+    console.log(`User ${userId} disconnected`);
   }
 
   @UseGuards(WsJwtGuard)
@@ -201,8 +237,8 @@ export class MessagesGateway
         );
       }
       onlineRecipients.forEach((memberId) => {
-        const memberSocketId = this.onlineUsers.get(memberId);
-        if (memberSocketId) {
+        const memberSocketIds = this.presenceService.getSocketIds(memberId);
+        memberSocketIds.forEach((memberSocketId) => {
           this.server.to(memberSocketId).emit('notification', {
             type: NotificationType.NEW_MESSAGE,
             payload: {
@@ -214,7 +250,7 @@ export class MessagesGateway
                   : `Sent a ${body.type} message`,
             },
           });
-        }
+        });
       });
     }
   }
@@ -412,6 +448,6 @@ export class MessagesGateway
   }
 
   isUserOnline(userId: string): boolean {
-    return this.onlineUsers.has(userId);
+    return this.presenceService.isOnline(userId);
   }
 }

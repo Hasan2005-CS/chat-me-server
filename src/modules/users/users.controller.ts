@@ -3,6 +3,7 @@ import {
   Get,
   Patch,
   Query,
+  Param,
   Req,
   Body,
   UseGuards,
@@ -17,6 +18,7 @@ import { memoryStorage } from 'multer';
 import { Request } from 'express';
 import { UsersService } from './users.service';
 import { UploadService } from '../upload/upload.service';
+import { PresenceService } from '../presence/presence.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UserDocument } from './schemas/user.schema';
 import {
@@ -24,6 +26,7 @@ import {
   ApiBody,
   ApiConsumes,
   ApiOperation,
+  ApiParam,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
@@ -39,6 +42,7 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly uploadService: UploadService,
+    private readonly presenceService: PresenceService,
   ) {}
 
   @UseGuards(JwtAuthGuard)
@@ -47,6 +51,19 @@ export class UsersController {
   @ApiQuery({ name: 'q', required: true, type: String, example: 'hasan' })
   search(@Query('q') query: string, @Req() req: RequestWithUser) {
     return this.usersService.search(query, req.user._id.toString());
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/presence')
+  @ApiOperation({ summary: 'Get a user online status and last seen time' })
+  @ApiParam({ name: 'id', type: String })
+  async getPresence(@Param('id') id: string) {
+    const isOnline = this.presenceService.isOnline(id);
+    if (isOnline) {
+      return { isOnline: true, lastSeenAt: null };
+    }
+    const user = await this.usersService.findById(id);
+    return { isOnline: false, lastSeenAt: user?.lastSeenAt ?? null };
   }
 
   @UseGuards(JwtAuthGuard)
