@@ -7,6 +7,7 @@ import {
 import { ConversationsService } from './conversations.service';
 import { ConversationsController } from './conversations.controller';
 import { AuthModule } from '../auth/auth.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { AuthModule } from '../auth/auth.module';
       { name: Conversation.name, schema: ConversationSchema },
     ]),
     AuthModule,
+    UsersModule,
   ],
   controllers: [ConversationsController],
   providers: [ConversationsService],
