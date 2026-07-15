@@ -38,6 +38,7 @@ describe('MessagesController', () => {
       );
       expect(mockMessagesService.findByConversation).toHaveBeenCalledWith(
         'c1',
+        '123',
         10,
         undefined,
       );

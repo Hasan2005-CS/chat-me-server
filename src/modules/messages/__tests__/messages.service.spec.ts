@@ -12,12 +12,20 @@ const mockMessageModel = {
   create: vi.fn(),
 };
 
+const mockUsersService = {
+  getBlockedUserIds: vi.fn(),
+};
+
 describe('MessagesService', () => {
   let messagesService: MessagesService;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    messagesService = new MessagesService(mockMessageModel as any);
+    mockUsersService.getBlockedUserIds.mockResolvedValue([]);
+    messagesService = new MessagesService(
+      mockMessageModel as any,
+      mockUsersService as any,
+    );
   });
 
   describe('create', () => {
@@ -101,13 +109,40 @@ describe('MessagesService', () => {
       mockMessageModel.find.mockReturnValue({ populate: populate1Fn });
 
       const conversationId = new Types.ObjectId().toString();
-      const result = await messagesService.findByConversation(conversationId);
+      const viewerId = new Types.ObjectId().toString();
+      const result = await messagesService.findByConversation(
+        conversationId,
+        viewerId,
+      );
 
       expect(result).toEqual(mockMessages);
       const query = mockMessageModel.find.mock.calls[0][0];
       expect(query._id).toBeUndefined();
       expect(query.conversation.toString()).toBe(conversationId);
       expect(query.isDeleted).toBe(false);
+      expect(query.sender).toBeUndefined();
+    });
+
+    it('should exclude messages from blocked senders when the viewer has blocked users', async () => {
+      const mockMessages = [{ id: 'm1' }];
+      const limitFn = vi.fn().mockResolvedValue(mockMessages);
+      const sortFn = vi.fn().mockReturnValue({ limit: limitFn });
+      const populate2Fn = vi.fn().mockReturnValue({ sort: sortFn });
+      const populate1Fn = vi.fn().mockReturnValue({ populate: populate2Fn });
+      mockMessageModel.find.mockReturnValue({ populate: populate1Fn });
+
+      const blockedId = new Types.ObjectId().toString();
+      mockUsersService.getBlockedUserIds.mockResolvedValue([blockedId]);
+
+      const conversationId = new Types.ObjectId().toString();
+      const viewerId = new Types.ObjectId().toString();
+      await messagesService.findByConversation(conversationId, viewerId);
+
+      expect(mockUsersService.getBlockedUserIds).toHaveBeenCalledWith(
+        viewerId,
+      );
+      const query = mockMessageModel.find.mock.calls[0][0];
+      expect(query.sender.$nin[0].toString()).toBe(blockedId);
     });
 
     it('should query with _id $lt filter when before is provided', async () => {
@@ -119,9 +154,11 @@ describe('MessagesService', () => {
       mockMessageModel.find.mockReturnValue({ populate: populate1Fn });
 
       const conversationId = new Types.ObjectId().toString();
+      const viewerId = new Types.ObjectId().toString();
       const before = new Types.ObjectId().toString();
       const result = await messagesService.findByConversation(
         conversationId,
+        viewerId,
         30,
         before,
       );

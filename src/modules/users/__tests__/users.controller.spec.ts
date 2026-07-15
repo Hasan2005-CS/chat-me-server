@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UsersController } from '../users.controller';
 import { UsersService } from '../users.service';
 import { UploadService } from '../../upload/upload.service';
+import { PresenceService } from '../../presence/presence.service';
 
 const mockUsersService = {
   search: vi.fn(),
@@ -13,6 +14,10 @@ const mockUploadService = {
   uploadFile: vi.fn(),
 };
 
+const mockPresenceService = {
+  isOnline: vi.fn(),
+};
+
 describe('UsersController', () => {
   let usersController: UsersController;
 
@@ -21,6 +26,7 @@ describe('UsersController', () => {
     usersController = new UsersController(
       mockUsersService as unknown as UsersService,
       mockUploadService as unknown as UploadService,
+      mockPresenceService as unknown as PresenceService,
     );
   });
 
