@@ -57,6 +57,7 @@ export class MessagesController {
 
     return this.messagesService.findByConversation(
       conversationId,
+      req.user.id,
       limit ? Number(limit) : undefined,
       before,
     );

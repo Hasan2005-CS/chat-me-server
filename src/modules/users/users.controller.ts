@@ -1,6 +1,8 @@
 import {
   Controller,
   Get,
+  Post,
+  Delete,
   Patch,
   Query,
   Param,
@@ -12,6 +14,7 @@ import {
   ParseFilePipe,
   MaxFileSizeValidator,
   FileTypeValidator,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -51,6 +54,35 @@ export class UsersController {
   @ApiQuery({ name: 'q', required: true, type: String, example: 'hasan' })
   search(@Query('q') query: string, @Req() req: RequestWithUser) {
     return this.usersService.search(query, req.user._id.toString());
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('blocked')
+  @ApiOperation({ summary: 'List users blocked by the current user' })
+  getBlockedUsers(@Req() req: RequestWithUser) {
+    return this.usersService.getBlockedUsers(req.user._id.toString());
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/block')
+  @ApiOperation({ summary: 'Block a user' })
+  @ApiParam({ name: 'id', description: 'User id to block' })
+  async blockUser(@Req() req: RequestWithUser, @Param('id') id: string) {
+    const currentUserId = req.user._id.toString();
+    if (id === currentUserId) {
+      throw new BadRequestException('You cannot block yourself.');
+    }
+    await this.usersService.blockUser(currentUserId, id);
+    return { blocked: true };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/block')
+  @ApiOperation({ summary: 'Unblock a user' })
+  @ApiParam({ name: 'id', description: 'User id to unblock' })
+  async unblockUser(@Req() req: RequestWithUser, @Param('id') id: string) {
+    await this.usersService.unblockUser(req.user._id.toString(), id);
+    return { blocked: false };
   }
 
   @UseGuards(JwtAuthGuard)

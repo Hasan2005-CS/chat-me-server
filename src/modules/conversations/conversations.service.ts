@@ -10,12 +10,14 @@ import {
   Conversation,
   ConversationDocument,
 } from './schemas/conversation.schema';
+import { UsersService } from '../users/users.service'; // + جديد
 
 @Injectable()
 export class ConversationsService {
   constructor(
     @InjectModel(Conversation.name)
     private readonly conversationModel: Model<ConversationDocument>,
+    private readonly usersService: UsersService, // + جديد
   ) {}
 
   async findOrCreateDirect(
@@ -30,8 +32,19 @@ export class ConversationsService {
       members: { $all: [memberA, memberB] },
     });
     if (conversation) {
+      // المحادثة موجودة أصلاً من قبل الحظر (إذا في حظر) -> منسمح بالوصول
+      // ليها، وترك التعامل مع الرسائل الجديدة لمنطق الحظر بمستوى الرسائل.
       return conversation;
     }
+
+    // + جديد: منع إنشاء محادثة مباشرة جديدة إذا في علاقة حظر بأي اتجاه.
+    const isBlocked = await this.usersService.isBlockRelated(userIdA, userIdB);
+    if (isBlocked) {
+      throw new ForbiddenException(
+        'Unable to start a conversation with this user.',
+      );
+    }
+
     conversation = await this.conversationModel.create({
       type: 'direct',
       members: [memberA, memberB],
@@ -43,6 +56,18 @@ export class ConversationsService {
     adminId: string,
     memberIds: string[],
   ): Promise<ConversationDocument> {
+    for (const memberId of memberIds) {
+      const isBlocked = await this.usersService.isBlockRelated(
+        adminId,
+        memberId,
+      );
+      if (isBlocked) {
+        throw new ForbiddenException(
+          'Unable to add one or more of the selected users to this group.',
+        );
+      }
+    }
+
     const allMembers = [
       new Types.ObjectId(adminId),
       ...memberIds.map((id) => new Types.ObjectId(id)),
@@ -59,7 +84,6 @@ export class ConversationsService {
     return this.conversationModel
       .find({
         members: new Types.ObjectId(userId),
-        deletedFor: { $ne: new Types.ObjectId(userId) },
       })
       .populate('members', 'displayName email avatar')
       .populate('lastMessage')
@@ -70,7 +94,6 @@ export class ConversationsService {
     return this.conversationModel
       .find({
         members: new Types.ObjectId(userId),
-        deletedFor: { $ne: new Types.ObjectId(userId) },
         name: { $regex: query, $options: 'i' },
       })
       .populate('members', 'displayName email avatar')
@@ -85,26 +108,7 @@ export class ConversationsService {
     await this.conversationModel.findByIdAndUpdate(conversationId, {
       lastMessage: new Types.ObjectId(messageId),
       lastMessageAt: new Date(),
-      deletedFor: [],
     });
-  }
-
-  async deleteChat(
-    conversationId: string,
-    userId: string,
-  ): Promise<{ deleted: true }> {
-    const conversation = await this.conversationModel.findById(conversationId);
-    if (
-      !conversation ||
-      !conversation.members.some((memberId) => String(memberId) === userId)
-    ) {
-      throw new NotFoundException('Conversation not found');
-    }
-
-    await this.conversationModel.findByIdAndUpdate(conversationId, {
-      $addToSet: { deletedFor: new Types.ObjectId(userId) },
-    });
-    return { deleted: true };
   }
 
   async isMember(conversationId: string, userId: string): Promise<boolean> {
@@ -139,6 +143,19 @@ export class ConversationsService {
     memberIds: string[],
   ): Promise<ConversationDocument> {
     await this.findGroupAsAdmin(conversationId, adminId);
+
+    for (const memberId of memberIds) {
+      const isBlocked = await this.usersService.isBlockRelated(
+        adminId,
+        memberId,
+      );
+      if (isBlocked) {
+        throw new ForbiddenException(
+          'Unable to add one or more of the selected users to this group.',
+        );
+      }
+    }
+
     const newMemberOids = memberIds.map((id) => new Types.ObjectId(id));
     return await this.conversationModel
       .findByIdAndUpdate(

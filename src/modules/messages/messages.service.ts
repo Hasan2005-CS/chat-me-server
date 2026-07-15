@@ -6,6 +6,7 @@ import {
   MessageDocument,
   MessageStatus,
 } from './schemas/message.schema';
+import { UsersService } from '../users/users.service'; // + جديد
 
 export interface CreateMessageDto {
   conversationId: string;
@@ -20,6 +21,7 @@ export class MessagesService {
   constructor(
     @InjectModel(Message.name)
     private readonly messageModel: Model<MessageDocument>,
+    private readonly usersService: UsersService, // + جديد
   ) {}
 
   async create(dto: CreateMessageDto): Promise<MessageDocument> {
@@ -37,13 +39,23 @@ export class MessagesService {
 
   async findByConversation(
     conversationId: string,
+    viewerId: string,
     limit: number = 30,
     before?: string,
   ): Promise<MessageDocument[]> {
+    const blockedIds = await this.usersService.getBlockedUserIds(viewerId);
+
     const query: Record<string, unknown> = {
       conversation: new Types.ObjectId(conversationId),
       isDeleted: false,
     };
+
+    if (blockedIds.length > 0) {
+      query.sender = {
+        $nin: blockedIds.map((id) => new Types.ObjectId(id)),
+      };
+    }
+
     if (before) {
       query._id = { $lt: new Types.ObjectId(before) };
     }
@@ -79,10 +91,15 @@ export class MessagesService {
       (id) => new Types.ObjectId(id),
     );
 
+    const blockedIds = await this.usersService.getBlockedUserIds(userId);
+
     const messages = await this.messageModel.find(
       {
         conversation: { $in: conversationOids },
-        sender: { $ne: userOid },
+        sender: {
+          $ne: userOid,
+          $nin: blockedIds.map((id) => new Types.ObjectId(id)),
+        },
         'receipts.user': { $ne: userOid },
       },
       '_id conversation',

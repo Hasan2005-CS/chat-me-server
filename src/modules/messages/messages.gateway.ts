@@ -87,8 +87,6 @@ export class MessagesGateway
         await socket.join(String(conversation.id));
       }
 
-      // addConnection returns true only for the FIRST active connection of
-      // this user (handles multiple tabs/devices correctly).
       const justCameOnline = this.presenceService.addConnection(
         payload.sub,
         socket.id,
@@ -127,8 +125,6 @@ export class MessagesGateway
     const userId = socket.user?.sub;
     if (!userId) return;
 
-    // removeConnection returns true only when NO other tabs/devices for
-    // this user remain connected (i.e. they are truly offline now).
     const justWentOffline = this.presenceService.removeConnection(
       userId,
       socket.id,
@@ -190,11 +186,35 @@ export class MessagesGateway
       message.id,
     );
 
-    this.server.to(body.conversationId).emit('new_message', message);
-
     const conversation = await this.conversationsService.findById(
       body.conversationId,
     );
+
+    let blockedRecipientId: string | null = null;
+    if (conversation && conversation.type === 'direct') {
+      const otherMemberId = conversation.members
+        .map((id) => String(id))
+        .find((id) => id !== senderId);
+      if (otherMemberId) {
+        const recipientBlockedSender = await this.usersService.hasBlocked(
+          otherMemberId,
+          senderId,
+        );
+        if (recipientBlockedSender) {
+          blockedRecipientId = otherMemberId;
+        }
+      }
+    }
+
+    if (blockedRecipientId) {
+      const senderSocketIds = this.presenceService.getSocketIds(senderId);
+      senderSocketIds.forEach((socketId) => {
+        this.server.to(socketId).emit('new_message', message);
+      });
+      return;
+    }
+
+    this.server.to(body.conversationId).emit('new_message', message);
 
     if (conversation) {
       const memberIds = conversation.members.map((id) => String(id));

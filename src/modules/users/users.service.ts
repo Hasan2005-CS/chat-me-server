@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
 import bcrypt from 'bcrypt';
 
@@ -95,5 +95,52 @@ export class UsersService {
     return this.userModel
       .findByIdAndUpdate(userId, { avatar: avatarUrl }, { new: true })
       .exec();
+  }
+
+  // ----- + جديد: منطق الحظر (Block) -----
+
+  async blockUser(userId: string, targetId: string): Promise<void> {
+    if (userId === targetId) return;
+    await this.userModel.findByIdAndUpdate(userId, {
+      $addToSet: { blockedUsers: new Types.ObjectId(targetId) },
+    });
+  }
+
+  async unblockUser(userId: string, targetId: string): Promise<void> {
+    await this.userModel.findByIdAndUpdate(userId, {
+      $pull: { blockedUsers: new Types.ObjectId(targetId) },
+    });
+  }
+
+  async getBlockedUsers(userId: string) {
+    const user = await this.userModel
+      .findById(userId)
+      .select('blockedUsers')
+      .populate('blockedUsers', 'displayName email avatar');
+    return user?.blockedUsers ?? [];
+  }
+
+  async getBlockedUserIds(userId: string): Promise<string[]> {
+    const user = await this.userModel.findById(userId).select('blockedUsers');
+    return (user?.blockedUsers ?? []).map((id) => id.toString());
+  }
+
+  async hasBlocked(userId: string, targetId: string): Promise<boolean> {
+    const user = await this.userModel.findById(userId).select('blockedUsers');
+    return !!user?.blockedUsers?.some((id) => id.toString() === targetId);
+  }
+
+  async isBlockRelated(userIdA: string, userIdB: string): Promise<boolean> {
+    const [userA, userB] = await Promise.all([
+      this.userModel.findById(userIdA).select('blockedUsers'),
+      this.userModel.findById(userIdB).select('blockedUsers'),
+    ]);
+    const aBlockedB = userA?.blockedUsers?.some(
+      (id) => id.toString() === userIdB,
+    );
+    const bBlockedA = userB?.blockedUsers?.some(
+      (id) => id.toString() === userIdA,
+    );
+    return Boolean(aBlockedB || bBlockedA);
   }
 }
