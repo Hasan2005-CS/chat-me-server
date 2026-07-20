@@ -40,10 +40,18 @@ export class CallsGateway implements OnGatewayDisconnect {
     private readonly configService: ConfigService,
   ) {}
 
-  private emitToUser(userId: string, event: string, payload: unknown) {
-    this.presenceService.getSocketIds(userId).forEach((socketId) => {
-      this.server.to(socketId).emit(event, payload);
-    });
+  private emitToUser(
+    userId: string,
+    event: string,
+    payload: unknown,
+    exceptSocketId?: string,
+  ) {
+    this.presenceService
+      .getSocketIds(userId)
+      .filter((socketId) => socketId !== exceptSocketId)
+      .forEach((socketId) => {
+        this.server.to(socketId).emit(event, payload);
+      });
   }
 
   private clearRingTimeout(callId: string) {
@@ -223,6 +231,12 @@ export class CallsGateway implements OnGatewayDisconnect {
       sdp: body.sdp,
       from: socket.user.sub,
     });
+    this.emitToUser(
+      socket.user.sub,
+      'call_answered_elsewhere',
+      { callId: body.callId },
+      socket.id,
+    );
   }
 
   @UseGuards(WsJwtGuard)
@@ -263,6 +277,12 @@ export class CallsGateway implements OnGatewayDisconnect {
       endedBy: socket.user.sub,
       reason: 'rejected',
     });
+    this.emitToUser(
+      socket.user.sub,
+      'call_ended',
+      { callId: body.callId, endedBy: socket.user.sub, reason: 'rejected' },
+      socket.id,
+    );
   }
 
   @UseGuards(WsJwtGuard)
@@ -283,5 +303,11 @@ export class CallsGateway implements OnGatewayDisconnect {
       endedBy: socket.user.sub,
       reason: 'ended',
     });
+    this.emitToUser(
+      socket.user.sub,
+      'call_ended',
+      { callId: body.callId, endedBy: socket.user.sub, reason: 'ended' },
+      socket.id,
+    );
   }
 }
