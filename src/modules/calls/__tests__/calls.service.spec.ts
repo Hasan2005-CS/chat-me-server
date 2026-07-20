@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Types } from 'mongoose';
 import { CallsService } from '../calls.service';
 import { CallStatus, CallType } from '../schemas/call.schema';
@@ -89,6 +93,7 @@ describe('CallsService', () => {
       const call = {
         caller: new Types.ObjectId(),
         callee: new Types.ObjectId(calleeId),
+        status: CallStatus.RINGING,
         save: vi.fn(),
       };
       mockCallModel.findById.mockResolvedValue(call);
@@ -98,6 +103,22 @@ describe('CallsService', () => {
       expect(result.status).toBe(CallStatus.REJECTED);
       expect(result.endReason).toBe('rejected');
     });
+
+    it('should throw ConflictException when the call is no longer ringing', async () => {
+      const calleeId = new Types.ObjectId().toString();
+      const call = {
+        caller: new Types.ObjectId(),
+        callee: new Types.ObjectId(calleeId),
+        status: CallStatus.ENDED,
+        save: vi.fn(),
+      };
+      mockCallModel.findById.mockResolvedValue(call);
+
+      await expect(callsService.reject('c1', calleeId)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(call.save).not.toHaveBeenCalled();
+    });
   });
 
   describe('end', () => {
@@ -106,6 +127,7 @@ describe('CallsService', () => {
       const call = {
         caller: new Types.ObjectId(callerId),
         callee: new Types.ObjectId(),
+        status: CallStatus.ACCEPTED,
         save: vi.fn(),
       };
       mockCallModel.findById.mockResolvedValue(call);
@@ -114,6 +136,22 @@ describe('CallsService', () => {
 
       expect(result.status).toBe(CallStatus.ENDED);
       expect(result.endReason).toBe('disconnected');
+    });
+
+    it('should throw ConflictException when the call has already ended', async () => {
+      const callerId = new Types.ObjectId().toString();
+      const call = {
+        caller: new Types.ObjectId(callerId),
+        callee: new Types.ObjectId(),
+        status: CallStatus.ENDED,
+        save: vi.fn(),
+      };
+      mockCallModel.findById.mockResolvedValue(call);
+
+      await expect(callsService.end('c1', callerId)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(call.save).not.toHaveBeenCalled();
     });
   });
 

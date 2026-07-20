@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -65,6 +66,9 @@ export class CallsService {
     const call = await this.callModel.findById(callId);
     if (!call) throw new NotFoundException('Call not found');
     this.assertParticipant(call, userId);
+    if (call.status !== CallStatus.RINGING) {
+      throw new ConflictException('Call is no longer ringing.');
+    }
 
     call.status = CallStatus.ACCEPTED;
     call.answeredAt = new Date();
@@ -76,6 +80,9 @@ export class CallsService {
     const call = await this.callModel.findById(callId);
     if (!call) throw new NotFoundException('Call not found');
     this.assertParticipant(call, userId);
+    if (call.status !== CallStatus.RINGING) {
+      throw new ConflictException('Call is no longer ringing.');
+    }
 
     call.status = CallStatus.REJECTED;
     call.endedAt = new Date();
@@ -92,6 +99,12 @@ export class CallsService {
     const call = await this.callModel.findById(callId);
     if (!call) throw new NotFoundException('Call not found');
     this.assertParticipant(call, userId);
+    if (
+      call.status !== CallStatus.RINGING &&
+      call.status !== CallStatus.ACCEPTED
+    ) {
+      throw new ConflictException('Call has already ended.');
+    }
 
     call.status = CallStatus.ENDED;
     call.endedAt = new Date();

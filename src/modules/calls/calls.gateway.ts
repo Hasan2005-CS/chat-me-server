@@ -7,10 +7,10 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { UseGuards } from '@nestjs/common';
+import { ConflictException, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CallsService } from './calls.service';
-import { CallType } from './schemas/call.schema';
+import { CallDocument, CallType } from './schemas/call.schema';
 import { ConversationsService } from '../conversations/conversations.service';
 import { UsersService } from '../users/users.service';
 import { PresenceService } from '../presence/presence.service';
@@ -219,7 +219,19 @@ export class CallsGateway implements OnGatewayDisconnect {
     @ConnectedSocket() socket: AuthSocket,
     @MessageBody() body: { callId: string; sdp: unknown },
   ) {
-    const call = await this.callsService.accept(body.callId, socket.user.sub);
+    let call: CallDocument;
+    try {
+      call = await this.callsService.accept(body.callId, socket.user.sub);
+    } catch (err) {
+      if (err instanceof ConflictException) {
+        socket.emit('call_ended', {
+          callId: body.callId,
+          reason: 'no_longer_available',
+        });
+        return;
+      }
+      throw err;
+    }
     this.clearRingTimeout(body.callId);
 
     const otherUserId = this.callsService.otherParticipant(
@@ -265,7 +277,13 @@ export class CallsGateway implements OnGatewayDisconnect {
     @ConnectedSocket() socket: AuthSocket,
     @MessageBody() body: { callId: string },
   ) {
-    const call = await this.callsService.reject(body.callId, socket.user.sub);
+    let call: CallDocument;
+    try {
+      call = await this.callsService.reject(body.callId, socket.user.sub);
+    } catch (err) {
+      if (err instanceof ConflictException) return;
+      throw err;
+    }
     this.clearRingTimeout(body.callId);
 
     const otherUserId = this.callsService.otherParticipant(
@@ -291,7 +309,13 @@ export class CallsGateway implements OnGatewayDisconnect {
     @ConnectedSocket() socket: AuthSocket,
     @MessageBody() body: { callId: string },
   ) {
-    const call = await this.callsService.end(body.callId, socket.user.sub);
+    let call: CallDocument;
+    try {
+      call = await this.callsService.end(body.callId, socket.user.sub);
+    } catch (err) {
+      if (err instanceof ConflictException) return;
+      throw err;
+    }
     this.clearRingTimeout(body.callId);
 
     const otherUserId = this.callsService.otherParticipant(
