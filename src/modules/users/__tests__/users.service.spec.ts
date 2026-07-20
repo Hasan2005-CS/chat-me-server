@@ -83,10 +83,7 @@ describe('UsersService', () => {
     it('should return null if not found', async () => {
       mockUserModel.findOne.mockResolvedValue(null);
 
-      const result = await usersService.findByProvider(
-        'google',
-        'unknown-id',
-      );
+      const result = await usersService.findByProvider('google', 'unknown-id');
 
       expect(result).toBeNull();
     });
@@ -94,14 +91,17 @@ describe('UsersService', () => {
 
   describe('findByEmailWithPassword', () => {
     it('should return user with password hash', async () => {
-      const mockUser = { id: '123', email: 'test@test.com', passwordHash: 'hash' };
+      const mockUser = {
+        id: '123',
+        email: 'test@test.com',
+        passwordHash: 'hash',
+      };
       mockUserModel.findOne.mockReturnValue({
         select: vi.fn().mockResolvedValue(mockUser),
       });
 
-      const result = await usersService.findByEmailWithPassword(
-        'test@test.com',
-      );
+      const result =
+        await usersService.findByEmailWithPassword('test@test.com');
 
       expect(result).toEqual(mockUser);
       expect(mockUserModel.findOne).toHaveBeenCalledWith({
@@ -149,10 +149,9 @@ describe('UsersService', () => {
 
       await usersService.updateLastSeen('123');
 
-      expect(mockUserModel.findByIdAndUpdate).toHaveBeenCalledWith(
-        '123',
-        { lastSeenAt: expect.any(Date) },
-      );
+      expect(mockUserModel.findByIdAndUpdate).toHaveBeenCalledWith('123', {
+        lastSeenAt: expect.any(Date),
+      });
     });
   });
 

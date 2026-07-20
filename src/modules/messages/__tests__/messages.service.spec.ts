@@ -138,9 +138,7 @@ describe('MessagesService', () => {
       const viewerId = new Types.ObjectId().toString();
       await messagesService.findByConversation(conversationId, viewerId);
 
-      expect(mockUsersService.getBlockedUserIds).toHaveBeenCalledWith(
-        viewerId,
-      );
+      expect(mockUsersService.getBlockedUserIds).toHaveBeenCalledWith(viewerId);
       const query = mockMessageModel.find.mock.calls[0][0];
       expect(query.sender.$nin[0].toString()).toBe(blockedId);
     });

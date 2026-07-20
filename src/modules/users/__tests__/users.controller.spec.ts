@@ -53,10 +53,7 @@ describe('UsersController', () => {
       const result = usersController.updateProfile(req, body);
 
       expect(result).toEqual(mockUser);
-      expect(mockUsersService.updateProfile).toHaveBeenCalledWith(
-        '123',
-        body,
-      );
+      expect(mockUsersService.updateProfile).toHaveBeenCalledWith('123', body);
     });
   });
 

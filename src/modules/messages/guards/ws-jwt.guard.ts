@@ -19,10 +19,7 @@ export class WsJwtGuard implements CanActivate {
 
     const token =
       (socket.handshake.auth?.token as string) ||
-      (socket.handshake.headers?.authorization?.replace(
-        'Bearer ',
-        '',
-      ) as string);
+      socket.handshake.headers?.authorization?.replace('Bearer ', '');
 
     if (!token) {
       throw new UnauthorizedException('No token provided');

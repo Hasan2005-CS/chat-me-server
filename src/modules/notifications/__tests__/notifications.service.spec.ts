@@ -57,11 +57,7 @@ describe('NotificationsService', () => {
       };
       mockNotificationModel.insertMany.mockResolvedValue([]);
 
-      await notificationsService.notifyNewMessage(
-        memberIds,
-        senderId,
-        payload,
-      );
+      await notificationsService.notifyNewMessage(memberIds, senderId, payload);
 
       expect(mockNotificationModel.insertMany).toHaveBeenCalledWith([
         {

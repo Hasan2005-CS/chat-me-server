@@ -142,9 +142,7 @@ describe('AuthController', () => {
     it('should redirect to error page when generateTokens throws', async () => {
       const req = { user: { id: '123' } };
       const res = { cookie: vi.fn(), redirect: vi.fn() };
-      mockAuthService.generateTokens.mockRejectedValueOnce(
-        new Error('boom'),
-      );
+      mockAuthService.generateTokens.mockRejectedValueOnce(new Error('boom'));
 
       await authController.googleCallback(req as any, res as any);
 
@@ -176,9 +174,7 @@ describe('AuthController', () => {
     it('should redirect to error page when generateTokens throws', async () => {
       const req = { user: { id: '123' } };
       const res = { cookie: vi.fn(), redirect: vi.fn() };
-      mockAuthService.generateTokens.mockRejectedValueOnce(
-        new Error('boom'),
-      );
+      mockAuthService.generateTokens.mockRejectedValueOnce(new Error('boom'));
 
       await authController.githubCallback(req as any, res as any);
 

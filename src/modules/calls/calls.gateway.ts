@@ -5,6 +5,7 @@ import {
   MessageBody,
   ConnectedSocket,
   OnGatewayDisconnect,
+  Ack,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { ConflictException, UseGuards } from '@nestjs/common';
@@ -15,7 +16,10 @@ import { ConversationsService } from '../conversations/conversations.service';
 import { UsersService } from '../users/users.service';
 import { PresenceService } from '../presence/presence.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../notifications/schemas/notification.schema';
 import { WsJwtGuard } from '../messages/guards/ws-jwt.guard';
+
+type CallInviteAck = (response: { callId?: string; error?: string }) => void;
 
 interface AuthSocket extends Socket {
   user: { sub: string; email: string };
@@ -62,6 +66,22 @@ export class CallsGateway implements OnGatewayDisconnect {
     }
   }
 
+  private async pushMissedCallNotification(
+    calleeId: string,
+    payload: {
+      conversationId: string;
+      callId: string;
+      callerName: string;
+      type: CallType;
+    },
+  ) {
+    await this.notificationsService.notifyMissedCall(calleeId, payload);
+    this.emitToUser(calleeId, 'notification', {
+      type: NotificationType.MISSED_CALL,
+      payload,
+    });
+  }
+
   async handleDisconnect(socket: AuthSocket) {
     const userId = socket.user?.sub;
     if (!userId) return;
@@ -91,6 +111,7 @@ export class CallsGateway implements OnGatewayDisconnect {
   async handleCallInvite(
     @ConnectedSocket() socket: AuthSocket,
     @MessageBody() body: { conversationId: string; type: 'audio' | 'video' },
+    @Ack() ack: CallInviteAck,
   ) {
     const callerId = socket.user.sub;
 
@@ -98,9 +119,7 @@ export class CallsGateway implements OnGatewayDisconnect {
       body.conversationId,
     );
     if (!conversation || conversation.type !== 'direct') {
-      socket.emit('error', {
-        message: 'Calls are only supported in direct conversations.',
-      });
+      ack({ error: 'Calls are only supported in direct conversations.' });
       return;
     }
 
@@ -108,7 +127,7 @@ export class CallsGateway implements OnGatewayDisconnect {
       .map((id) => String(id))
       .find((id) => id !== callerId);
     if (!calleeId) {
-      socket.emit('error', { message: 'Callee not found.' });
+      ack({ error: 'Callee not found.' });
       return;
     }
 
@@ -117,9 +136,7 @@ export class CallsGateway implements OnGatewayDisconnect {
       calleeId,
     );
     if (isBlocked) {
-      socket.emit('error', {
-        message: 'Unable to call this user.',
-      });
+      ack({ error: 'Unable to call this user.' });
       return;
     }
 
@@ -128,6 +145,7 @@ export class CallsGateway implements OnGatewayDisconnect {
       this.callsService.findActiveCallForUser(calleeId),
     ]);
     if (callerActiveCall || calleeActiveCall) {
+      ack({ error: 'busy' });
       socket.emit('call_busy', { conversationId: body.conversationId });
       return;
     }
@@ -140,23 +158,33 @@ export class CallsGateway implements OnGatewayDisconnect {
       type,
     );
     const callId = String(call._id);
+    const caller = await this.usersService.findById(callerId);
+    const callerName = caller?.displayName ?? socket.user.email;
 
     if (!this.presenceService.isOnline(calleeId)) {
       await this.callsService.markUnavailable(callId);
+      // The caller still needs this callId to correctly match the
+      // call_ended it's about to receive, even though no ringing UI
+      // was ever shown.
+      ack({ callId });
       socket.emit('call_ended', { callId, reason: 'unavailable' });
-      await this.notificationsService.notifyMissedCall(calleeId, {
+      await this.pushMissedCallNotification(calleeId, {
         conversationId: body.conversationId,
         callId,
-        callerName: socket.user.email,
+        callerName,
         type,
       });
       return;
     }
 
+    ack({ callId });
+
     this.emitToUser(calleeId, 'incoming_call', {
       callId,
       conversationId: body.conversationId,
       callerId,
+      callerName,
+      callerAvatar: caller?.avatar,
       type,
     });
 
@@ -167,7 +195,14 @@ export class CallsGateway implements OnGatewayDisconnect {
     this.ringTimeouts.set(
       callId,
       setTimeout(() => {
-        void this.handleRingTimeout(callId, callerId, calleeId, body, type);
+        void this.handleRingTimeout(
+          callId,
+          callerId,
+          calleeId,
+          body,
+          type,
+          callerName,
+        );
       }, ringTimeoutMs),
     );
   }
@@ -178,6 +213,7 @@ export class CallsGateway implements OnGatewayDisconnect {
     calleeId: string,
     body: { conversationId: string },
     type: CallType,
+    callerName: string,
   ) {
     this.ringTimeouts.delete(callId);
     const missed = await this.callsService.markMissed(callId);
@@ -185,10 +221,10 @@ export class CallsGateway implements OnGatewayDisconnect {
 
     this.emitToUser(callerId, 'call_ended', { callId, reason: 'no_answer' });
     this.emitToUser(calleeId, 'call_ended', { callId, reason: 'no_answer' });
-    await this.notificationsService.notifyMissedCall(calleeId, {
+    await this.pushMissedCallNotification(calleeId, {
       conversationId: body.conversationId,
       callId,
-      callerName: '',
+      callerName,
       type,
     });
   }

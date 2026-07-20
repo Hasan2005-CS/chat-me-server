@@ -28,8 +28,14 @@ async function bootstrap() {
     .setTitle('ChatMe API')
     .setDescription('API documentation for ChatMe application')
     .setVersion('1.0')
-    .setExternalDoc('GitHub Repository', 'https://github.com/Hasan2005-CS/chat-me-server')
-    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'JWT')
+    .setExternalDoc(
+      'GitHub Repository',
+      'https://github.com/Hasan2005-CS/chat-me-server',
+    )
+    .addBearerAuth(
+      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      'JWT',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -38,8 +44,7 @@ async function bootstrap() {
       persistAuthorization: true,
       tagsSorter: 'alpha',
       operationsSorter: 'alpha',
-          withCredentials:      true, 
-
+      withCredentials: true,
     },
     customSiteTitle: 'Chat-Me API Documentation',
   });
@@ -47,7 +52,7 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const port = configService.get<number>('port');
 
-  await app.listen(port as number);
+  await app.listen(port);
   console.log(`Server running on http://localhost:${port}/api/v1`);
   console.log(`Swagger docs: http://localhost:${port}/docs`);
 }
