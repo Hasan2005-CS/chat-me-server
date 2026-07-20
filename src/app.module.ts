@@ -11,6 +11,7 @@ import { MessagesModule } from './modules/messages/messages.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { PresenceModule } from './modules/presence/presence.module';
+import { CallsModule } from './modules/calls/calls.module';
 
 import { UploadModule } from './modules/upload/upload.module';
 
@@ -34,6 +35,7 @@ import { UploadModule } from './modules/upload/upload.module';
     NotificationsModule,
     UploadModule,
     PresenceModule,
+    CallsModule,
     ThrottlerModule.forRoot([
       {
         name: 'short',

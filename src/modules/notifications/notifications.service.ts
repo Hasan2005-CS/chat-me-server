@@ -42,6 +42,22 @@ export class NotificationsService {
     }));
     await this.notificationModel.insertMany(notifications);
   }
+  async notifyMissedCall(
+    recipientId: string,
+    payload: {
+      conversationId: string;
+      callId: string;
+      callerName: string;
+      type: 'audio' | 'video';
+    },
+  ): Promise<void> {
+    await this.notificationModel.create({
+      recipient: new Types.ObjectId(recipientId),
+      type: NotificationType.MISSED_CALL,
+      payload,
+    });
+  }
+
   async findUnread(userId: string): Promise<NotificationDocument[]> {
     return this.notificationModel
       .find({ recipient: new Types.ObjectId(userId), isRead: false })

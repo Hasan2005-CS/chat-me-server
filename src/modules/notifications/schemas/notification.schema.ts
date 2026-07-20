@@ -7,6 +7,7 @@ export enum NotificationType {
   NEW_MESSAGE = 'new_message',
   GROUP_ADDED = 'group_added',
   GROUP_REMOVED = 'group_removed',
+  MISSED_CALL = 'missed_call',
 }
 
 @Schema({ timestamps: true })

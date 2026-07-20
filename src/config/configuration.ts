@@ -27,6 +27,11 @@ export const envSchema = z.object({
   CLOUDINARY_CLOUD_NAME: z.string().min(1),
   CLOUDINARY_API_KEY: z.string().min(1),
   CLOUDINARY_API_SECRET: z.string().min(1),
+
+  TURN_URLS: z.string().default(''),
+  TURN_USERNAME: z.string().default(''),
+  TURN_CREDENTIAL: z.string().default(''),
+  CALL_RING_TIMEOUT_MS: z.coerce.number().default(45000),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -70,6 +75,17 @@ export default () => ({
     cloudName: env.CLOUDINARY_CLOUD_NAME,
     apiKey: env.CLOUDINARY_API_KEY,
     apiSecret: env.CLOUDINARY_API_SECRET,
+  },
+
+  webrtc: {
+    turnUrls: env.TURN_URLS
+      ? env.TURN_URLS.split(',')
+          .map((url) => url.trim())
+          .filter(Boolean)
+      : [],
+    turnUsername: env.TURN_USERNAME,
+    turnCredential: env.TURN_CREDENTIAL,
+    callRingTimeoutMs: env.CALL_RING_TIMEOUT_MS,
   },
 });
 
